@@ -22,7 +22,9 @@
     gameplayActive:false,
     move:{x:0,y:0,power:0,active:false,pointerId:null},
     aim:{x:1,y:0,power:0,active:false,pointerId:null,lastX:1,lastY:0},
-    dashPulseUntil:0
+    dashPulseUntil:0,
+    fullscreenPending:false,
+    orientationLocked:false
   };
 
   let controlsEl=null;
@@ -30,8 +32,10 @@
   let aimStick=null;
   let dashButton=null;
   let pauseButton=null;
+  let rotateHint=null;
   let lastDashTap=0;
   let mobileQuery=null;
+  let startActionsWrapped=false;
 
   function clamp(v,min,max){
     return Math.max(min,Math.min(max,v));
@@ -60,6 +64,76 @@
     const shortSide=Math.min(innerWidth,innerHeight);
     const longSide=Math.max(innerWidth,innerHeight);
     return (coarse||hasTouch)&&(shortSide<=930||longSide<=1180);
+  }
+
+  function fullscreenElement(){
+    return document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement||null;
+  }
+
+  function fullscreenRequestElement(){
+    return document.documentElement||document.body;
+  }
+
+  function updateResponsiveVars(){
+    if(!state.enabled){
+      document.body.classList.remove('mobile-landscape','mobile-portrait');
+      return;
+    }
+    const root=document.documentElement;
+    const shortSide=Math.min(innerWidth,innerHeight);
+    const longSide=Math.max(innerWidth,innerHeight);
+    const landscape=innerWidth>=innerHeight;
+    const sizeBase=landscape?shortSide:Math.min(shortSide,longSide*.52);
+    const stick=Math.round(clamp(sizeBase*(landscape ? .29 : .31),92,146));
+    const dash=Math.round(clamp(stick*.57,56,82));
+    const pause=Math.round(clamp(sizeBase*.108,38,54));
+    const gap=Math.round(clamp(sizeBase*.035,10,24));
+    root.style.setProperty('--mobile-stick-size',stick+'px');
+    root.style.setProperty('--mobile-dash-size',dash+'px');
+    root.style.setProperty('--mobile-pause-size',pause+'px');
+    root.style.setProperty('--mobile-edge-gap',gap+'px');
+    document.body.classList.toggle('mobile-landscape',landscape);
+    document.body.classList.toggle('mobile-portrait',!landscape);
+  }
+
+  function lockLandscape(){
+    const orientation=screen.orientation||screen.mozOrientation||screen.msOrientation;
+    if(!orientation||typeof orientation.lock!=='function')return Promise.resolve(false);
+    return orientation.lock('landscape').then(()=>{
+      state.orientationLocked=true;
+      return true;
+    }).catch(()=>false);
+  }
+
+  function requestLandscapeFullscreen(){
+    if(!state.enabled)return Promise.resolve(false);
+    updateResponsiveVars();
+    const el=fullscreenRequestElement();
+    const request=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+    const afterFullscreen=()=>lockLandscape();
+    if(fullscreenElement())return afterFullscreen();
+    if(!request){
+      state.fullscreenPending=true;
+      return Promise.resolve(false);
+    }
+    let result;
+    try{
+      result=request.call(el);
+    }catch(e){
+      state.fullscreenPending=true;
+      return Promise.resolve(false);
+    }
+    if(result&&typeof result.then==='function'){
+      return result.then(()=>{
+        state.fullscreenPending=false;
+        return afterFullscreen();
+      }).catch(()=>{
+        state.fullscreenPending=true;
+        return false;
+      });
+    }
+    state.fullscreenPending=false;
+    return afterFullscreen();
   }
 
   function setVirtualKey(code,value){
@@ -127,6 +201,7 @@
       if(!state.enabled)return;
       event.preventDefault();
       event.stopPropagation();
+      requestLandscapeFullscreen();
       const stick=state[kind];
       stick.pointerId=event.pointerId;
       try{el.setPointerCapture(event.pointerId)}catch(e){}
@@ -154,6 +229,7 @@
     if(!state.enabled||!state.gameplayActive)return;
     event.preventDefault();
     event.stopPropagation();
+    requestLandscapeFullscreen();
     const now=performance.now();
     if(now-lastDashTap<DASH_TAP_LOCK_MS)return;
     lastDashTap=now;
@@ -165,6 +241,7 @@
     if(!state.enabled)return;
     event.preventDefault();
     event.stopPropagation();
+    requestLandscapeFullscreen();
     const rt=runtime();
     if(!rt||!rt.started||rt.gameOver||isVisible('levelOverlay'))return;
     const fn=window.togglePause||(window.GameUI&&window.GameUI.togglePause);
@@ -216,10 +293,15 @@
     dashButton.textContent='DASH';
     dashButton.setAttribute('aria-label','Dash');
 
+    rotateHint=document.createElement('div');
+    rotateHint.id='mobileRotateHint';
+    rotateHint.innerHTML='<div class="mobileRotatePanel"><div class="mobileRotateIcon"></div><div class="mobileRotateTitle">请横屏游玩</div><div class="mobileRotateText">点击屏幕会尝试进入全屏并锁定横屏。</div></div>';
+
     controlsEl.appendChild(pauseButton);
     controlsEl.appendChild(moveStick);
     controlsEl.appendChild(aimStick);
     controlsEl.appendChild(dashButton);
+    controlsEl.appendChild(rotateHint);
     document.body.appendChild(controlsEl);
 
     bindStick(moveStick,'move');
@@ -236,6 +318,11 @@
       if(dashButton)dashButton.classList.remove('is-pressed');
     });
     pauseButton.addEventListener('pointerdown',triggerPause);
+    rotateHint.addEventListener('pointerdown',event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      requestLandscapeFullscreen();
+    });
   }
 
   function applyViewportMeta(){
@@ -256,7 +343,10 @@
   function setMobileMode(next){
     next=!!next;
     if(next)ensureDom();
-    if(state.enabled===next)return;
+    if(state.enabled===next){
+      if(next)updateResponsiveVars();
+      return;
+    }
     state.enabled=next;
     document.documentElement.classList.toggle(MOBILE_CLASS,next);
     document.body.classList.toggle(MOBILE_CLASS,next);
@@ -266,9 +356,11 @@
       releaseStick('aim');
       releaseVirtualKeys();
       state.gameplayActive=false;
-      document.body.classList.remove(ACTIVE_CLASS);
+      document.body.classList.remove(ACTIVE_CLASS,'mobile-landscape','mobile-portrait');
     }else{
       applyViewportMeta();
+      updateResponsiveVars();
+      requestLandscapeFullscreen();
     }
   }
 
@@ -349,17 +441,55 @@
 
   function refreshMobileMode(){
     setMobileMode(shouldEnableMobileMode());
+    if(state.enabled)requestLandscapeFullscreen();
   }
 
   function preventMobileGestures(event){
     if(state.enabled)event.preventDefault();
   }
 
+  function handleMobileGesture(event){
+    if(!state.enabled)return;
+    if(event&&event.target&&event.target.closest&&event.target.closest('input,textarea,select'))return;
+    requestLandscapeFullscreen();
+  }
+
+  function wrapStartActions(){
+    if(startActionsWrapped)return;
+    ['startGame','restartGame'].forEach(name=>{
+      const original=window[name];
+      if(typeof original!=='function'||original.__mobileFullscreenWrapped)return;
+      const wrapped=function(){
+        if(state.enabled)requestLandscapeFullscreen();
+        return original.apply(this,arguments);
+      };
+      wrapped.__mobileFullscreenWrapped=true;
+      window[name]=wrapped;
+    });
+    startActionsWrapped=true;
+  }
+
   function init(){
     mobileQuery=matchMedia('(pointer: coarse), (hover: none), (max-width: 820px)');
+    wrapStartActions();
     refreshMobileMode();
-    addEventListener('resize',refreshMobileMode,{passive:true});
-    addEventListener('orientationchange',refreshMobileMode,{passive:true});
+    addEventListener('resize',()=>{
+      updateResponsiveVars();
+      refreshMobileMode();
+    },{passive:true});
+    addEventListener('orientationchange',()=>{
+      setTimeout(updateResponsiveVars,80);
+      setTimeout(refreshMobileMode,120);
+    },{passive:true});
+    ['pointerdown','touchstart','click'].forEach(type=>{
+      document.addEventListener(type,handleMobileGesture,{capture:true,passive:true});
+    });
+    ['fullscreenchange','webkitfullscreenchange','MSFullscreenChange'].forEach(type=>{
+      document.addEventListener(type,()=>{
+        updateResponsiveVars();
+        if(state.enabled&&fullscreenElement())lockLandscape();
+      });
+    });
     if(mobileQuery.addEventListener)mobileQuery.addEventListener('change',refreshMobileMode);
     else if(mobileQuery.addListener)mobileQuery.addListener(refreshMobileMode);
     document.addEventListener('touchmove',preventMobileGestures,{passive:false});
@@ -370,6 +500,7 @@
   window.GameMobileControls={
     state,
     refresh:refreshMobileMode,
+    requestFullscreen:requestLandscapeFullscreen,
     setMobileMode,
     release:releaseVirtualKeys
   };
