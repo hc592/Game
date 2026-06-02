@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game Web Audio SFX Lab</title>
+  <style>
+    :root {
+      --bg: #070914;
+      --panel: rgba(18, 24, 38, 0.94);
+      --panel-soft: rgba(28, 35, 52, 0.78);
+      --line: rgba(156, 205, 255, 0.18);
+      --line-strong: rgba(120, 225, 255, 0.55);
+      --text: #edf6ff;
+      --muted: #9daec4;
+      --cyan: #7ee8ff;
+      --green: #79f0aa;
+      --amber: #ffd66e;
+      --pink: #ff83b0;
+      --violet: #b89cff;
+      --shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        linear-gradient(90deg, rgba(126, 232, 255, 0.045) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(184, 156, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(135deg, #070914 0%, #101222 44%, #090c17 100%);
+      background-size: 44px 44px, 44px 44px, auto;
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-weight: 750;
+      transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+    }
+
+    button:hover {
+      border-color: rgba(126, 232, 255, 0.42);
+      background: rgba(126, 232, 255, 0.11);
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      color: #061018;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--cyan), var(--green));
+    }
+
+    button.warn {
+      color: #191006;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--amber), #ffab70);
+    }
+
+    button.good {
+      color: #04150d;
+      border-color: transparent;
+      background: linear-gradient(135deg, #79f0aa, #7ee8ff);
+    }
+
+    button.danger {
+      color: #fff1f5;
+      border-color: rgba(255, 131, 176, 0.36);
+      background: rgba(255, 131, 176, 0.13);
+    }
+
+    .app {
+      width: min(1520px, 100%);
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+
+    .hero,
+    .connection,
+    .panel,
+    .layerCard {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(22, 29, 45, 0.95), rgba(10, 14, 26, 0.95));
+      box-shadow: var(--shadow);
+      border-radius: 8px;
+    }
+
+    .hero {
+      padding: 20px 22px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+      max-width: 920px;
+      font-size: 14px;
+    }
+
+    .connection {
+      min-width: 315px;
+      padding: 16px;
+      display: grid;
+      align-content: center;
+      gap: 9px;
+    }
+
+    .statusLine {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .statusValue {
+      color: var(--cyan);
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 330px minmax(0, 1fr) 410px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .sectionTitle {
+      margin: 0 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .searchBox,
+    .field input,
+    .field select,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(4, 8, 16, 0.68);
+      color: var(--text);
+      border-radius: 8px;
+      outline: none;
+      padding: 10px 11px;
+    }
+
+    .searchBox:focus,
+    .field input:focus,
+    .field select:focus,
+    textarea:focus {
+      border-color: var(--line-strong);
+    }
+
+    select option {
+      background: #0b1020;
+      color: var(--text);
+    }
+
+    .categoryTabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+
+    .categoryTabs button {
+      padding: 8px 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .categoryTabs button.active {
+      color: #061018;
+      border-color: transparent;
+      background: var(--cyan);
+    }
+
+    .soundList {
+      display: grid;
+      gap: 8px;
+      max-height: calc(100vh - 245px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .soundBtn {
+      text-align: left;
+      display: grid;
+      gap: 5px;
+      padding: 11px;
+      background: rgba(255,255,255,0.045);
+    }
+
+    .soundBtn.active {
+      border-color: rgba(126, 232, 255, 0.8);
+      background: rgba(126, 232, 255, 0.12);
+      box-shadow: 0 0 0 1px rgba(126, 232, 255, 0.2) inset;
+    }
+
+    .soundBtn b {
+      font-size: 13px;
+    }
+
+    .soundBtn span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .soundTag {
+      display: inline-flex;
+      width: fit-content;
+      color: #08111b;
+      background: var(--green);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin: 12px 0;
+    }
+
+    .buttonRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .editorHeader {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .controlGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .control,
+    .wideControl {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .wideControl {
+      grid-column: 1 / -1;
+    }
+
+    .control label,
+    .wideControl label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 9px;
+      color: #dbe7ff;
+      font-size: 13px;
+    }
+
+    .value {
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--cyan);
+    }
+
+    .miniBtns {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .miniBtns button {
+      padding: 8px 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .kbd {
+      color: #07111e;
+      background: var(--cyan);
+      padding: 2px 6px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .field {
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .aliasBox {
+      display: none;
+      color: #d7f8ff;
+      background: rgba(126, 232, 255, 0.08);
+      border: 1px solid rgba(126, 232, 255, 0.18);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+
+    .layers {
+      display: grid;
+      gap: 10px;
+    }
+
+    .layerCard {
+      padding: 12px;
+      box-shadow: none;
+      background: rgba(255,255,255,0.045);
+    }
+
+    .layerTop {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .layerTitle {
+      font-weight: 850;
+      color: #dffaff;
+    }
+
+    .layerGrid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .previewCanvas {
+      width: 100%;
+      height: 190px;
+      display: block;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(4, 8, 16, 0.68);
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .jsonBox {
+      min-height: 310px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      max-width: 420px;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: 180ms ease;
+      border: 1px solid rgba(126, 232, 255, 0.26);
+      background: rgba(9, 13, 24, 0.96);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 13px 15px;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      line-height: 1.45;
+      z-index: 50;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .switchRow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .switchRow input {
+      accent-color: var(--cyan);
+    }
+
+    @media (max-width: 1220px) {
+      .topbar,
+      .main {
+        grid-template-columns: 1fr;
+      }
+      .connection {
+        min-width: 0;
+      }
+      .soundList {
+        max-height: 360px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .app {
+        padding: 14px;
+      }
+      .editorHeader,
+      .layerGrid,
+      .controlGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .miniBtns {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <section class="hero">
+        <h1>Game Web Audio SFX Lab</h1>
+        <p class="subtitle">
+          独立调音后台页面。左侧列出游戏当前所有普通音效和武器音效，选择后可以编辑每个 tone/noise layer。若从游戏内用 Ctrl+Alt+F8 打开，本页会直接连接当前游戏窗口并修改正在运行的 window.GameAudioPresets。
+        </p>
+      </section>
+
+      <aside class="connection">
+        <div class="statusLine"><span>连接状态</span><span id="connectionStatus" class="statusValue">检测中</span></div>
+        <div class="statusLine"><span>当前音效</span><span id="currentStatus" class="statusValue">-</span></div>
+        <label class="switchRow"><input id="autoApply" type="checkbox" checked> 实时应用到当前运行状态</label>
+      </aside>
+    </header>
+
+    <main class="main">
+      <aside class="panel">
+        <div class="sectionTitle">
+          <span>游戏音效</span>
+          <span id="soundCount" class="hint">0</span>
+        </div>
+        <input id="searchBox" class="searchBox" type="search" placeholder="搜索音效，例如 dash / 爆炸 / melee" />
+        <div class="categoryTabs">
+          <button id="tabAll" class="active" type="button" data-filter="all">全部</button>
+          <button id="tabSfx" type="button" data-filter="sfx">SFX</button>
+          <button id="tabWeapon" type="button" data-filter="weapon">武器</button>
+        </div>
+        <div id="soundList" class="soundList"></div>
+      </aside>
+
+      <section class="panel">
+        <div class="sectionTitle">
+          <span>参数调试</span>
+          <span class="hint"><span class="kbd">V</span> 试听当前音效</span>
+        </div>
+
+        <div id="aliasBox" class="aliasBox"></div>
+        <div id="aliasBadge" class="hint" style="margin-bottom:10px"></div>
+
+        <div class="controlGrid">
+          <div class="control">
+            <label>波形 <span class="value" id="waveLabel">square</span></label>
+            <select id="wave">
+              <option value="sine">sine 柔和</option>
+              <option value="square">square 像素感</option>
+              <option value="sawtooth">sawtooth 尖锐</option>
+              <option value="triangle">triangle 厚一点</option>
+            </select>
+          </div>
+
+          <div class="control">
+            <label>滤波类型 <span class="value" id="filterTypeLabel">lowpass</span></label>
+            <select id="filterType">
+              <option value="lowpass">lowpass 变闷/爆炸</option>
+              <option value="highpass">highpass 去低频</option>
+              <option value="bandpass">bandpass 机械感</option>
+              <option value="none">none 不滤波</option>
+            </select>
+          </div>
+
+          <div class="control"><label>起始频率 <span class="value" id="frequencyVal"></span></label><input id="frequency" type="range" min="20" max="2400" step="1" /></div>
+          <div class="control"><label>结束频率 <span class="value" id="endFrequencyVal"></span></label><input id="endFrequency" type="range" min="20" max="2400" step="1" /></div>
+          <div class="control"><label>持续时间 <span class="value" id="durationVal"></span></label><input id="duration" type="range" min="0.02" max="2.5" step="0.01" /></div>
+          <div class="control"><label>音量 <span class="value" id="volumeVal"></span></label><input id="volume" type="range" min="0" max="1" step="0.01" /></div>
+          <div class="control"><label>起音 Attack <span class="value" id="attackVal"></span></label><input id="attack" type="range" min="0.001" max="0.5" step="0.001" /></div>
+          <div class="control"><label>尾音 Decay <span class="value" id="decayVal"></span></label><input id="decay" type="range" min="0.005" max="2.2" step="0.005" /></div>
+          <div class="control"><label>滤波频率 <span class="value" id="filterFreqVal"></span></label><input id="filterFreq" type="range" min="80" max="8000" step="10" /></div>
+          <div class="control"><label>滤波 Q 值 <span class="value" id="filterQVal"></span></label><input id="filterQ" type="range" min="0.1" max="30" step="0.1" /></div>
+          <div class="control"><label>噪声比例 <span class="value" id="noiseVal"></span></label><input id="noise" type="range" min="0" max="1" step="0.01" /></div>
+          <div class="control"><label>噪声滤波 <span class="value" id="noiseFilterVal"></span></label><input id="noiseFilter" type="range" min="80" max="8000" step="10" /></div>
+          <div class="control"><label>延迟 Delay <span class="value" id="delayVal"></span></label><input id="delay" type="range" min="0" max="0.35" step="0.005" /></div>
+          <div class="control"><label>重复次数 Steps <span class="value" id="stepsVal"></span></label><input id="steps" type="range" min="1" max="8" step="1" /></div>
+          <div class="control"><label>步进间隔 <span class="value" id="stepGapVal"></span></label><input id="stepGap" type="range" min="0.02" max="0.45" step="0.01" /></div>
+          <div class="control"><label>音高随机 <span class="value" id="randomPitchVal"></span></label><input id="randomPitch" type="range" min="0" max="240" step="1" /></div>
+          <div class="control"><label>声像 Pan <span class="value" id="panVal"></span></label><input id="pan" type="range" min="-1" max="1" step="0.01" /></div>
+          <div class="control"><label>主音混入 <span class="value" id="toneMixVal"></span></label><input id="toneMix" type="range" min="0" max="1" step="0.01" /></div>
+          <div class="control"><label>Throttle <span class="value" id="throttleVal"></span></label><input id="throttle" type="range" min="0" max="1.5" step="0.005" /></div>
+        </div>
+
+        <div class="buttonRow">
+          <button id="previewBtn" class="primary" type="button">试听</button>
+          <button id="previewSeqBtn" class="good" type="button">连续试听 5 次</button>
+          <button id="randomizeBtn" class="warn" type="button">随机一点</button>
+          <button id="applyBtn" class="warn" type="button">应用到游戏</button>
+          <button id="resetBtn" type="button">恢复当前预设</button>
+        </div>
+
+        <div class="miniBtns">
+          <button data-shape="click" type="button">按钮点击</button>
+          <button data-shape="laser" type="button">激光</button>
+          <button data-shape="hit" type="button">受击</button>
+          <button data-shape="boom" type="button">爆炸</button>
+          <button data-shape="pickup" type="button">拾取</button>
+          <button data-shape="level" type="button">升级</button>
+          <button data-shape="dash" type="button">闪避</button>
+          <button data-shape="boss" type="button">Boss 警告</button>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="sectionTitle">
+          <span>预览与配置</span>
+          <span class="hint">JSON 可复制保存</span>
+        </div>
+        <canvas id="previewCanvas" class="previewCanvas" width="760" height="280"></canvas>
+        <div class="toolbar">
+          <button id="exportAllBtn" type="button">导出全部 JSON</button>
+          <button id="exportCurrentBtn" type="button">导出当前音效</button>
+          <button id="importBtn" class="warn" type="button">从 JSON 导入</button>
+          <button id="copyBtn" class="primary" type="button">复制 JSON</button>
+        </div>
+        <textarea id="jsonBox" class="jsonBox" spellcheck="false"></textarea>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="../core/audioPresets.js"></script>
+  <script>
+    (function(){
+      'use strict';
+
+      const SOUND_META = {
+        sfx: {
+          ui: ['UI 点击', '菜单、按钮和确认反馈'],
+          dash: ['闪避', '玩家瞬移或短距离闪避'],
+          boost: ['推进', 'Shift 推进和加速反馈'],
+          playerHit: ['玩家受击', '飞船受伤、危险提示'],
+          hit: ['通用命中', '备用命中或碰撞反馈'],
+          pickup: ['拾取经验', '经验、资源、小奖励拾取'],
+          heal: ['治疗', '回血道具和生命恢复'],
+          level: ['升级/奖励', '升级、获得武器、获得被动'],
+          boss: ['Boss 警告', 'Boss 出现、阶段变化、危险攻击'],
+          explode: ['爆炸', '导弹、地雷、范围爆炸'],
+          laser: ['敌方激光', '敌人远程攻击或激光提示'],
+          missile: ['导弹', '导弹发射或追踪弹'],
+          homing: ['追踪/僚机', '暗属性僚机、追踪类提示和自动锁定反馈'],
+          rail: ['轨道炮', '直线贯穿光束'],
+          chain: ['连锁闪电', '电弧跳跃和链式攻击'],
+          beam: ['光束', '持续短光束或聚焦射线'],
+          mine: ['地雷', '布雷、触发前提示'],
+          enemyKill: ['敌人死亡', '怪物死亡碎裂和击杀反馈']
+        },
+        weapon: {
+          thunderLance: ['武器：球形闪电', '独立可调：球形闪电/电属性基础发射'],
+          starSword: ['武器：星火剑', '独立可调：剑气、弧刃和近距离斩击'],
+          moonBlade: ['武器：月刃', '独立可调：回旋刃发射'],
+          shadowDagger: ['武器：幽影匕首', '独立可调：暗属性追踪匕首'],
+          frostRing: ['武器：冰霜环', '独立可调：扩散冰环/环绕冰霜'],
+          holyPrism: ['武器：圣棱镜', '独立可调：棱镜光效和格挡反馈'],
+          dragonBreath: ['武器：龙息喷焰', '独立可调：扇形喷焰/火焰流'],
+          meteorStaff: ['武器：陨星法杖', '独立可调：陨石召唤和落点反馈'],
+          poisonVine: ['武器：毒藤立场', '独立可调：毒藤区域和持续伤害'],
+          voidHole: ['武器：虚空黑洞', '独立可调：黑洞牵引和低频空间感'],
+          missilePod: ['武器：导弹舱', '独立可调：基础追踪导弹'],
+          railCannon: ['武器：轨道炮', '独立可调：直线贯穿轨道炮'],
+          arcEmitter: ['武器：连锁电弧', '独立可调：电弧跳跃和链式攻击'],
+          mineLayer: ['武器：布雷器', '独立可调：布雷/部署提示'],
+          beamCore: ['武器：光束核心', '独立可调：短光束/聚焦射线'],
+          frostMissile: ['武器：寒冰导弹', '独立可调：冰属性追踪导弹'],
+          rageMinigun: ['武器：狂暴机枪', '独立可调：高频暗属性机枪'],
+          energyTurret: ['武器：高能炮塔', '独立可调：炮塔部署/召唤反馈'],
+          shadowFleet: ['武器：幽影舰队', '独立可调：僚机召唤和追踪反馈'],
+          plasmaRay: ['武器：等离子射线', '独立可调：火属性等离子短射线']
+        }
+      };
+
+      const WAVE_TYPES = ['sine','square','sawtooth','triangle'];
+      const FILTER_TYPES = ['lowpass','highpass','bandpass','notch','allpass'];
+      const CHANNEL = 'game-audio-sfx-lab';
+      const $ = id => document.getElementById(id);
+
+      let targetWindow = null;
+      let presets = null;
+      let defaults = null;
+      let bridgeMode = false;
+      let booted = false;
+      let eventsBound = false;
+      let selected = {category: 'sfx', name: 'ui'};
+      let editPath = {category: 'sfx', name: 'ui'};
+      let selectedLayerIndex = 0;
+      let draft = null;
+      let filter = 'all';
+      let audioCtx = null;
+      let masterGain = null;
+
+      const SHAPE_PRESET_MAP = {
+        click: ['sfx','ui'],
+        laser: ['sfx','laser'],
+        hit: ['sfx','playerHit'],
+        boom: ['sfx','explode'],
+        pickup: ['sfx','pickup'],
+        level: ['sfx','level'],
+        dash: ['sfx','dash'],
+        boss: ['sfx','boss']
+      };
+
+      function clone(value){
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function canUseOpener(){
+        try{
+          return !!(window.opener && !window.opener.closed && window.opener.GameAudioPresets);
+        }catch(err){
+          return false;
+        }
+      }
+
+      function connectTarget(){
+        if(canUseOpener()){
+          targetWindow = window.opener;
+          bridgeMode = false;
+          if(!targetWindow.GameAudioPresets)targetWindow.GameAudioPresets = clone(window.GameAudioPresets || {sfx:{}, weapon:{}});
+          if(!targetWindow.GameAudioDefaultPresets)targetWindow.GameAudioDefaultPresets = clone(window.GameAudioDefaultPresets || targetWindow.GameAudioPresets);
+          presets = targetWindow.GameAudioPresets;
+          defaults = targetWindow.GameAudioDefaultPresets;
+          $('connectionStatus').textContent = '已连接游戏窗口';
+          return true;
+        }
+
+        if(window.opener && !window.opener.closed){
+          targetWindow = window.opener;
+          bridgeMode = true;
+          $('connectionStatus').textContent = '等待游戏窗口回应';
+          targetWindow.postMessage({channel: CHANNEL, type: 'request-state'}, '*');
+          return false;
+        }
+
+        targetWindow = window;
+        bridgeMode = false;
+        if(!targetWindow.GameAudioPresets)targetWindow.GameAudioPresets = clone(window.GameAudioPresets || {sfx:{}, weapon:{}});
+        if(!targetWindow.GameAudioDefaultPresets)targetWindow.GameAudioDefaultPresets = clone(window.GameAudioDefaultPresets || targetWindow.GameAudioPresets);
+        presets = targetWindow.GameAudioPresets;
+        defaults = targetWindow.GameAudioDefaultPresets;
+        $('connectionStatus').textContent = '独立预览模式';
+        return true;
+      }
+
+      function postToGame(message){
+        if(targetWindow && targetWindow !== window && typeof targetWindow.postMessage === 'function'){
+          targetWindow.postMessage(Object.assign({channel: CHANNEL},message),'*');
+        }
+      }
+
+      function bootInterface(){
+        if(booted || !presets)return;
+        booted = true;
+        const firstCategory = presets.sfx ? 'sfx' : Object.keys(presets)[0];
+        const firstName = Object.keys(presets[firstCategory] || {})[0] || '';
+        selected = {category:firstCategory, name:firstName};
+        renderSoundList();
+        selectSound(selected.category,selected.name);
+      }
+
+      function handleBridgeMessage(event){
+        const data = event.data || {};
+        if(data.channel !== CHANNEL)return;
+        if(data.type === 'state-response'){
+          bridgeMode = true;
+          presets = data.presets || {sfx:{}, weapon:{}};
+          defaults = data.defaults || clone(presets);
+          $('connectionStatus').textContent = data.hasGameAudio ? '已连接游戏窗口' : '已连接配置窗口';
+          bootInterface();
+        }else if(data.type === 'apply-ack'){
+          $('connectionStatus').textContent = '已连接游戏窗口';
+        }else if(data.type === 'replace-ack'){
+          $('connectionStatus').textContent = '配置已替换';
+        }else if(data.type === 'preview-ack'){
+          $('connectionStatus').textContent = '试听已发送到游戏';
+        }
+      }
+
+      function getMeta(category,name){
+        const meta = SOUND_META[category] && SOUND_META[category][name];
+        return meta || [category + '.' + name, '自定义音效'];
+      }
+
+      function resolvePreset(category,name,seen){
+        const item = presets && presets[category] && presets[category][name];
+        if(!item)return {category, name, preset: {layers: []}, missing: true};
+        if(!item.alias)return {category, name, preset: item};
+        const seenMap = seen || {};
+        const key = category + ':' + name;
+        if(seenMap[key])return {category, name, preset: item, circular: true};
+        seenMap[key] = true;
+        const alias = String(item.alias);
+        let nextCategory = item.aliasCategory || (category === 'weapon' ? 'sfx' : category);
+        let nextName = alias;
+        if(alias.indexOf('.') > 0){
+          const parts = alias.split('.');
+          nextCategory = parts[0] || nextCategory;
+          nextName = parts[1] || nextName;
+        }
+        return resolvePreset(nextCategory,nextName,seenMap);
+      }
+
+      function allSounds(){
+        const out = [];
+        for(const category of ['sfx','weapon']){
+          const names = Object.keys((presets && presets[category]) || {});
+          for(const name of names){
+            const meta = getMeta(category,name);
+            const item = presets[category][name] || {};
+            out.push({category, name, label: meta[0], desc: meta[1], alias: item.alias});
+          }
+        }
+        return out;
+      }
+
+      function renderSoundList(){
+        const query = $('searchBox').value.trim().toLowerCase();
+        const list = $('soundList');
+        const sounds = allSounds().filter(sound => {
+          if(filter !== 'all' && sound.category !== filter)return false;
+          const hay = [sound.category, sound.name, sound.label, sound.desc].join(' ').toLowerCase();
+          return !query || hay.includes(query);
+        });
+        $('soundCount').textContent = sounds.length + ' 项';
+        list.innerHTML = '';
+        for(const sound of sounds){
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'soundBtn' + (sound.category === selected.category && sound.name === selected.name ? ' active' : '');
+          const aliasLine = sound.alias ? '<span class="soundTag">alias</span>' : '';
+          button.innerHTML = '<b>' + escapeHtml(sound.category + '.' + sound.name) + '</b>' +
+            '<span>' + escapeHtml(sound.label) + '</span>' +
+            '<span>' + escapeHtml(sound.desc) + '</span>' + aliasLine;
+          button.addEventListener('click', () => selectSound(sound.category,sound.name));
+          list.appendChild(button);
+        }
+      }
+
+      function selectSound(category,name){
+        selected = {category, name};
+        const resolved = resolvePreset(category,name);
+        editPath = {category: resolved.category, name: resolved.name};
+        draft = clone(resolved.preset || {layers: []});
+        if(!Array.isArray(draft.layers))draft.layers = [];
+        selectedLayerIndex = 0;
+        renderSoundList();
+        renderEditor();
+        drawPreview();
+        exportCurrent();
+        showToast('已选择 ' + category + '.' + name);
+      }
+
+      const SIMPLE_CONTROL_IDS = [
+        'frequency','endFrequency','duration','volume','attack','decay','filterFreq','filterQ',
+        'noise','noiseFilter','delay','steps','stepGap','randomPitch','pan','toneMix','throttle'
+      ];
+
+      const SIMPLE_FORMATTERS = {
+        frequency: value => Math.round(Number(value)) + ' Hz',
+        endFrequency: value => Math.round(Number(value)) + ' Hz',
+        duration: value => Number(value).toFixed(2) + ' s',
+        volume: value => Math.round(Number(value) * 100) + '%',
+        attack: value => Number(value).toFixed(3) + ' s',
+        decay: value => Number(value).toFixed(3) + ' s',
+        filterFreq: value => Math.round(Number(value)) + ' Hz',
+        filterQ: value => Number(value).toFixed(1),
+        noise: value => Math.round(Number(value) * 100) + '%',
+        noiseFilter: value => Math.round(Number(value)) + ' Hz',
+        delay: value => Number(value).toFixed(3) + ' s',
+        steps: value => String(Math.round(Number(value))),
+        stepGap: value => Number(value).toFixed(2) + ' s',
+        randomPitch: value => '±' + Math.round(Number(value)) + ' Hz',
+        pan: value => Number(value).toFixed(2),
+        toneMix: value => Math.round(Number(value) * 100) + '%',
+        throttle: value => Number(value).toFixed(3) + ' s'
+      };
+
+      function simpleDefault(){
+        return {
+          wave: 'square',
+          filterType: 'lowpass',
+          frequency: 760,
+          endFrequency: 520,
+          duration: 0.07,
+          volume: 0.14,
+          attack: 0.004,
+          decay: 0.065,
+          filterFreq: 2200,
+          filterQ: 0.8,
+          noise: 0,
+          noiseFilter: 1800,
+          delay: 0,
+          steps: 1,
+          stepGap: 0.08,
+          randomPitch: 10,
+          pan: 0,
+          toneMix: 1,
+          throttle: 0
+        };
+      }
+
+      function cleanSimple(simple){
+        const base = simpleDefault();
+        const s = Object.assign({},base,simple || {});
+        s.wave = WAVE_TYPES.includes(s.wave) ? s.wave : base.wave;
+        s.filterType = ['lowpass','highpass','bandpass','none'].includes(s.filterType) ? s.filterType : base.filterType;
+        s.frequency = clampNumber(numberOr(s.frequency,base.frequency),20,2400);
+        s.endFrequency = clampNumber(numberOr(s.endFrequency,base.endFrequency),20,2400);
+        s.duration = clampNumber(numberOr(s.duration,base.duration),0.02,2.5);
+        s.volume = clampNumber(numberOr(s.volume,base.volume),0,1);
+        s.attack = clampNumber(numberOr(s.attack,base.attack),0.001,0.5);
+        s.decay = clampNumber(numberOr(s.decay,base.decay),0.005,2.2);
+        s.filterFreq = clampNumber(numberOr(s.filterFreq,base.filterFreq),80,8000);
+        s.filterQ = clampNumber(numberOr(s.filterQ,base.filterQ),0.1,30);
+        s.noise = clampNumber(numberOr(s.noise,base.noise),0,1);
+        s.noiseFilter = clampNumber(numberOr(s.noiseFilter,base.noiseFilter),80,8000);
+        s.delay = clampNumber(numberOr(s.delay,base.delay),0,0.35);
+        s.steps = Math.round(clampNumber(numberOr(s.steps,base.steps),1,8));
+        s.stepGap = clampNumber(numberOr(s.stepGap,base.stepGap),0.02,0.45);
+        s.randomPitch = clampNumber(numberOr(s.randomPitch,base.randomPitch),0,240);
+        s.pan = clampNumber(numberOr(s.pan,base.pan),-1,1);
+        s.toneMix = clampNumber(numberOr(s.toneMix,base.toneMix),0,1);
+        s.throttle = clampNumber(numberOr(s.throttle,base.throttle),0,1.5);
+        return s;
+      }
+
+      function draftToSimple(preset){
+        const base = simpleDefault();
+        const layers = Array.isArray(preset && preset.layers) ? preset.layers : [];
+        const toneLayers = layers.filter(layer => layer && layer.kind === 'tone');
+        const noiseLayers = layers.filter(layer => layer && layer.kind === 'noise');
+        const toneLayer = toneLayers[0] || {};
+        const noiseLayer = noiseLayers[0] || {};
+        const toneGain = numberOr(toneLayer.gain,0);
+        const noiseGain = numberOr(noiseLayer.gain,0);
+        const volume = Math.max(0.01,toneGain + noiseGain,numberOr(preset && preset.volume,0));
+        let stepGap = base.stepGap;
+        if(toneLayers.length > 1){
+          stepGap = Math.max(0.02,numberOr(toneLayers[1].delay,0) - numberOr(toneLayers[0].delay,0));
+        }else if(noiseLayers.length > 1){
+          stepGap = Math.max(0.02,numberOr(noiseLayers[1].delay,0) - numberOr(noiseLayers[0].delay,0));
+        }
+        return cleanSimple({
+          wave: toneLayer.wave || preset && preset.wave || base.wave,
+          filterType: toneLayer.filterType || preset && preset.filterType || base.filterType,
+          frequency: numberOr(toneLayer.frequency,base.frequency),
+          endFrequency: numberOr(toneLayer.frequency,base.frequency) + numberOr(toneLayer.slide,0),
+          duration: numberOr(toneLayer.duration,numberOr(noiseLayer.duration,base.duration)),
+          volume: Math.min(1,volume),
+          attack: numberOr(toneLayer.attack,numberOr(preset && preset.attack,base.attack)),
+          decay: numberOr(toneLayer.decay,numberOr(preset && preset.decay,Math.max(0.005,numberOr(toneLayer.duration,base.duration) - numberOr(toneLayer.attack,0)))),
+          filterFreq: numberOr(toneLayer.filterFreq,numberOr(preset && preset.filterFreq,base.filterFreq)),
+          filterQ: numberOr(toneLayer.filterQ,numberOr(preset && preset.filterQ,base.filterQ)),
+          noise: noiseGain > 0 ? clampNumber(noiseGain / Math.max(volume,0.001),0,1) : numberOr(preset && preset.noise,0),
+          noiseFilter: numberOr(noiseLayer.filterFreq,numberOr(preset && preset.noiseFilter,base.noiseFilter)),
+          delay: Math.min(0.35,numberOr(toneLayer.delay,numberOr(noiseLayer.delay,base.delay))),
+          steps: Math.max(1,Math.min(8,Math.max(toneLayers.length,noiseLayers.length,numberOr(preset && preset.steps,1)))),
+          stepGap,
+          randomPitch: numberOr(toneLayer.randomPitch,numberOr(preset && preset.randomPitch,base.randomPitch)),
+          pan: numberOr(toneLayer.pan,numberOr(preset && preset.pan,base.pan)),
+          toneMix: toneGain > 0 ? clampNumber(toneGain / Math.max(volume,0.001),0,1) : numberOr(preset && preset.toneMix,1),
+          throttle: numberOr(preset && preset.throttle,0)
+        });
+      }
+
+      function simpleToDraft(simple,basePreset){
+        const s = cleanSimple(simple);
+        const next = clone(basePreset || {});
+        const layers = [];
+        for(let i=0;i<s.steps;i++){
+          const stepDelay = Number((s.delay + i * s.stepGap).toFixed(3));
+          const pitchOffset = i * 42;
+          const endOffset = i * 35;
+          if(s.toneMix > 0.001 && s.volume > 0.001){
+            const startFreq = Math.max(20,s.frequency + pitchOffset);
+            const endFreq = Math.max(20,s.endFrequency + endOffset);
+            layers.push({
+              kind: 'tone',
+              frequency: Number(startFreq.toFixed(3)),
+              duration: Number(s.duration.toFixed(3)),
+              wave: s.wave,
+              gain: Number((s.volume * s.toneMix).toFixed(3)),
+              delay: stepDelay,
+              slide: Number((endFreq - startFreq).toFixed(3)),
+              attack: Number(s.attack.toFixed(3)),
+              decay: Number(s.decay.toFixed(3)),
+              filterType: s.filterType,
+              filterFreq: Math.round(s.filterFreq),
+              filterQ: Number(s.filterQ.toFixed(2)),
+              randomPitch: Math.round(s.randomPitch),
+              pan: Number(s.pan.toFixed(2))
+            });
+          }
+          if(s.noise > 0.001 && s.volume > 0.001){
+            layers.push({
+              kind: 'noise',
+              duration: Number(s.duration.toFixed(3)),
+              gain: Number((s.volume * s.noise).toFixed(3)),
+              delay: stepDelay,
+              filterFreq: Math.round(s.noiseFilter),
+              filterType: 'lowpass',
+              attack: Number(s.attack.toFixed(3)),
+              decay: Number(s.decay.toFixed(3)),
+              pan: Number(s.pan.toFixed(2))
+            });
+          }
+        }
+        if(!layers.length){
+          layers.push({kind:'tone', frequency: s.frequency, duration: s.duration, wave: s.wave, gain: 0.001, delay: s.delay, slide: s.endFrequency - s.frequency});
+        }
+        next.layers = layers;
+        if(s.throttle > 0)next.throttle = Number(s.throttle.toFixed(3));
+        else delete next.throttle;
+        next.__labSimple = s;
+        return next;
+      }
+
+      function currentSimple(){
+        return draftToSimple(draft || simpleToDraft(simpleDefault(),{}));
+      }
+
+      function renderEditor(){
+        const selectedLabel = selected.category + '.' + selected.name;
+        const editLabel = editPath.category + '.' + editPath.name;
+        $('currentStatus').textContent = selectedLabel;
+        $('aliasBadge').textContent = selectedLabel === editLabel ? '' : 'alias -> ' + editLabel;
+        const aliasBox = $('aliasBox');
+        if(selectedLabel !== editLabel){
+          aliasBox.style.display = 'block';
+          aliasBox.textContent = selectedLabel + ' 是别名，当前编辑会直接修改真实目标 ' + editLabel + '，因此同样引用该目标的音效也会一起变化。';
+        }else{
+          aliasBox.style.display = 'none';
+          aliasBox.textContent = '';
+        }
+        applySimpleToControls(currentSimple());
+      }
+
+      function applySimpleToControls(simple){
+        const s = cleanSimple(simple);
+        $('wave').value = s.wave;
+        $('filterType').value = s.filterType;
+        for(const id of SIMPLE_CONTROL_IDS){
+          if($(id))$(id).value = s[id];
+        }
+        updateControlLabels(s);
+      }
+
+      function readSimpleFromDom(){
+        const simple = {};
+        simple.wave = $('wave').value;
+        simple.filterType = $('filterType').value;
+        for(const id of SIMPLE_CONTROL_IDS){
+          if($(id))simple[id] = Number($(id).value);
+        }
+        return cleanSimple(simple);
+      }
+
+      function updateControlLabels(simple){
+        const s = cleanSimple(simple || readSimpleFromDom());
+        $('waveLabel').textContent = s.wave;
+        $('filterTypeLabel').textContent = s.filterType;
+        for(const id of SIMPLE_CONTROL_IDS){
+          const label = $(id + 'Val');
+          if(label && SIMPLE_FORMATTERS[id])label.textContent = SIMPLE_FORMATTERS[id](s[id]);
+        }
+      }
+
+      function readDraftFromDom(){
+        const simple = readSimpleFromDom();
+        draft = simpleToDraft(simple,draft || {});
+        updateControlLabels(simple);
+      }
+
+      function applyDraft(skipRead){
+        if(!skipRead)readDraftFromDom();
+        if(!presets[editPath.category])presets[editPath.category] = {};
+        presets[editPath.category][editPath.name] = clone(draft);
+        if(bridgeMode){
+          postToGame({type:'apply-preset', category: editPath.category, name: editPath.name, preset: clone(draft)});
+        }else if(targetWindow !== window){
+          targetWindow.GameAudioPresets = presets;
+        }
+        drawPreview();
+        exportCurrent();
+      }
+
+      function totalSimpleDuration(simple){
+        const s = cleanSimple(simple);
+        return s.delay + Math.max(0,s.steps - 1) * s.stepGap + s.duration + s.decay;
+      }
+
+      function preview(){
+        readDraftFromDom();
+        if(bridgeMode){
+          postToGame({
+            type: 'preview',
+            selected: clone(selected),
+            editPath: clone(editPath),
+            preset: clone(draft),
+            commit: $('autoApply').checked
+          });
+          if($('autoApply').checked){
+            if(!presets[editPath.category])presets[editPath.category] = {};
+            presets[editPath.category][editPath.name] = clone(draft);
+          }
+          drawPreview();
+          return;
+        }
+        const audio = targetWindow && targetWindow.GameAudio;
+        if(audio && (typeof audio.playSfx === 'function' || typeof audio.playWeaponSfx === 'function')){
+          const group = presets[editPath.category] || (presets[editPath.category] = {});
+          const hadPrevious = Object.prototype.hasOwnProperty.call(group,editPath.name);
+          const previous = hadPrevious ? clone(group[editPath.name]) : undefined;
+          const previewPreset = clone(draft);
+          previewPreset.throttle = 0;
+          group[editPath.name] = previewPreset;
+          try{
+            if(selected.category === 'weapon' && typeof audio.playWeaponSfx === 'function')audio.playWeaponSfx(selected.name);
+            else if(typeof audio.playSfx === 'function')audio.playSfx(selected.name);
+          }finally{
+            if($('autoApply').checked){
+              group[editPath.name] = clone(draft);
+            }else if(hadPrevious){
+              group[editPath.name] = previous;
+            }else{
+              delete group[editPath.name];
+            }
+          }
+        }else{
+          playLocalPreset(draft);
+        }
+        drawPreview();
+      }
+
+      function estimatePresetDuration(preset){
+        return totalSimpleDuration(draftToSimple(preset));
+      }
+
+      function previewSequence(){
+        readDraftFromDom();
+        let count = 0;
+        const gap = Math.max(0.12,estimatePresetDuration(draft) + 0.08) * 1000;
+        const playNext = () => {
+          preview();
+          count += 1;
+          if(count < 5)setTimeout(playNext,gap);
+        };
+        playNext();
+        showToast('连续试听 5 次');
+      }
+
+      function clampNumber(value,min,max){
+        return Math.min(max,Math.max(min,value));
+      }
+
+      function roundStep(value,step){
+        return Math.round(value / step) * step;
+      }
+
+      function randomizeCurrent(){
+        readDraftFromDom();
+        const simple = currentSimple();
+        const jitter = amount => (Math.random() * 2 - 1) * amount;
+        simple.frequency = clampNumber(Math.round(simple.frequency + jitter(120)),20,2400);
+        simple.endFrequency = clampNumber(Math.round(simple.endFrequency + jitter(120)),20,2400);
+        simple.duration = Number(clampNumber(roundStep(simple.duration + jitter(0.05),0.01),0.02,2.5).toFixed(2));
+        simple.volume = Number(clampNumber(roundStep(simple.volume + jitter(0.06),0.01),0,1).toFixed(2));
+        simple.filterFreq = clampNumber(Math.round(simple.filterFreq + jitter(350)),80,8000);
+        simple.noise = Number(clampNumber(roundStep(simple.noise + jitter(0.08),0.01),0,1).toFixed(2));
+        simple.randomPitch = clampNumber(Math.round(simple.randomPitch + Math.random() * 20),0,240);
+        applySimpleToControls(simple);
+        readDraftFromDom();
+        applyDraft(true);
+        drawPreview();
+        exportCurrent();
+        preview();
+        showToast('已随机微调，并试听一次');
+      }
+
+      function resetCurrent(){
+        const resolvedDefault = resolveDefault(selected.category,selected.name);
+        if(!resolvedDefault){
+          showToast('没有找到默认配置，无法重置');
+          return;
+        }
+        draft = clone(resolvedDefault.preset);
+        editPath = {category: resolvedDefault.category, name: resolvedDefault.name};
+        selectedLayerIndex = 0;
+        applyDraft(true);
+        renderEditor();
+        showToast('已重置 ' + editPath.category + '.' + editPath.name);
+      }
+
+      function resolveDefault(category,name,seen){
+        const item = defaults && defaults[category] && defaults[category][name];
+        if(!item)return null;
+        if(!item.alias)return {category, name, preset: item};
+        const seenMap = seen || {};
+        const key = category + ':' + name;
+        if(seenMap[key])return null;
+        seenMap[key] = true;
+        const alias = String(item.alias);
+        let nextCategory = item.aliasCategory || (category === 'weapon' ? 'sfx' : category);
+        let nextName = alias;
+        if(alias.indexOf('.') > 0){
+          const parts = alias.split('.');
+          nextCategory = parts[0] || nextCategory;
+          nextName = parts[1] || nextName;
+        }
+        return resolveDefault(nextCategory,nextName,seenMap);
+      }
+
+      function exportAll(){
+        $('jsonBox').value = JSON.stringify(presets,null,2);
+        showToast('已导出全部配置');
+      }
+
+      function exportCurrent(){
+        const out = {};
+        out[editPath.category] = {};
+        out[editPath.category][editPath.name] = clone(draft);
+        $('jsonBox').value = JSON.stringify(out,null,2);
+      }
+
+      function importJson(){
+        try{
+          const parsed = JSON.parse($('jsonBox').value);
+          if(!parsed || typeof parsed !== 'object')throw new Error('JSON root must be an object');
+          if(parsed.sfx || parsed.weapon){
+            if(parsed.sfx)presets.sfx = parsed.sfx;
+            if(parsed.weapon)presets.weapon = parsed.weapon;
+          }else if(parsed.layers || parsed.alias){
+            if(!presets[editPath.category])presets[editPath.category] = {};
+            presets[editPath.category][editPath.name] = parsed;
+          }else{
+            throw new Error('Need full {sfx, weapon} config or one preset object');
+          }
+          if(bridgeMode){
+            postToGame({type:'replace-presets', presets: clone(presets)});
+          }else{
+            targetWindow.GameAudioPresets = presets;
+          }
+          selectSound(selected.category,selected.name);
+          renderSoundList();
+          showToast('导入完成，当前运行状态已替换');
+        }catch(err){
+          showToast('导入失败：' + err.message);
+        }
+      }
+
+      async function copyJson(){
+        try{
+          await navigator.clipboard.writeText($('jsonBox').value);
+          showToast('JSON 已复制');
+        }catch(err){
+          $('jsonBox').select();
+          document.execCommand('copy');
+          showToast('已尝试复制，若失败请手动复制文本框');
+        }
+      }
+
+      function drawPreview(){
+        const canvas = $('previewCanvas');
+        const ctx = canvas.getContext('2d');
+        const simple = currentSimple();
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0,0,w,h);
+        const grd = ctx.createLinearGradient(0,0,0,h);
+        grd.addColorStop(0,'rgba(113, 215, 255, 0.08)');
+        grd.addColorStop(1,'rgba(155, 124, 255, 0.035)');
+        ctx.fillStyle = grd;
+        ctx.fillRect(0,0,w,h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        for(let i=1;i<6;i++){
+          const y = h / 6 * i;
+          ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+        }
+        for(let i=1;i<10;i++){
+          const x = w / 10 * i;
+          ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+        }
+        const total = Math.max(0.1,totalSimpleDuration(simple));
+        const minFreq = 20;
+        const maxFreq = 2400;
+        const toX = t => t / total * w;
+        const toYFreq = f => h - ((Math.log(Math.max(minFreq,f)) - Math.log(minFreq)) / (Math.log(maxFreq) - Math.log(minFreq))) * h;
+        const toYEnv = amp => h - Math.min(1,Math.max(0,amp)) * (h * 0.42) - 20;
+        for(let s=0;s<simple.steps;s++){
+          const base = simple.delay + s * simple.stepGap;
+          const fA = simple.frequency + s * 42;
+          const fB = simple.endFrequency + s * 35;
+          ctx.strokeStyle = 'rgba(113, 215, 255, 0.95)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(toX(base),toYFreq(fA));
+          ctx.lineTo(toX(base + simple.duration),toYFreq(fB));
+          ctx.stroke();
+          ctx.strokeStyle = 'rgba(114, 242, 164, 0.8)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(toX(base),toYEnv(0));
+          ctx.lineTo(toX(base + simple.attack),toYEnv(simple.volume));
+          ctx.lineTo(toX(base + simple.duration + simple.decay),toYEnv(0));
+          ctx.stroke();
+          if(simple.noise > 0){
+            ctx.fillStyle = 'rgba(255, 211, 107, ' + (0.08 + simple.noise * 0.12) + ')';
+            ctx.fillRect(toX(base),0,Math.max(3,toX(base + simple.duration) - toX(base)),h);
+          }
+        }
+        ctx.fillStyle = 'rgba(234,241,255,0.7)';
+        ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
+        ctx.fillText('cyan = pitch curve',14,22);
+        ctx.fillText('green = volume envelope',14,42);
+        if(simple.noise > 0)ctx.fillText('yellow zone = noise layer',14,62);
+      }
+
+      function ensureLocalAudio(){
+        if(!audioCtx){
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0.9;
+          masterGain.connect(audioCtx.destination);
+        }
+        if(audioCtx.state === 'suspended')audioCtx.resume();
+      }
+
+      function playLocalPreset(preset){
+        ensureLocalAudio();
+        for(const layer of preset.layers || []){
+          if(layer.kind === 'tone')localTone(layer);
+          else if(layer.kind === 'noise')localNoise(layer);
+        }
+      }
+
+      function localTone(layer){
+        const t = audioCtx.currentTime + numberOr(layer.delay,0);
+        const d = Math.max(0.001,numberOr(layer.duration,0.1));
+        const f = Math.max(20,numberOr(layer.frequency,440));
+        const attack = Math.min(numberOr(layer.attack,0.01),d * 0.85);
+        const decay = Math.max(0.005,numberOr(layer.decay,0.04));
+        const randomPitch = (Math.random() * 2 - 1) * numberOr(layer.randomPitch,0);
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const pan = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+        osc.type = layer.wave || 'sine';
+        osc.frequency.setValueAtTime(Math.max(20,f + randomPitch),t);
+        const target = Math.max(20,f + numberOr(layer.slide,0) + randomPitch);
+        if(target !== f)osc.frequency.exponentialRampToValueAtTime(target,t+d);
+        gain.gain.setValueAtTime(0.0001,t);
+        gain.gain.linearRampToValueAtTime(numberOr(layer.gain,0.08),t+attack);
+        gain.gain.exponentialRampToValueAtTime(0.001,t+d+decay);
+        let outputNode = gain;
+        if(pan){
+          pan.pan.value = numberOr(layer.pan,0);
+          gain.connect(pan);
+          outputNode = pan;
+        }
+        if(layer.filterType && layer.filterType !== 'none'){
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = layer.filterType;
+          filter.frequency.value = numberOr(layer.filterFreq,2200);
+          filter.Q.value = numberOr(layer.filterQ,0.8);
+          osc.connect(filter);
+          filter.connect(gain);
+        }else{
+          osc.connect(gain);
+        }
+        outputNode.connect(masterGain);
+        osc.start(t);
+        osc.stop(t+d+decay+0.04);
+      }
+
+      function localNoise(layer){
+        const t = audioCtx.currentTime + numberOr(layer.delay,0);
+        const d = Math.max(0.001,numberOr(layer.duration,0.1));
+        const decay = Math.max(0.005,numberOr(layer.decay,0.04));
+        const buffer = audioCtx.createBuffer(1,Math.ceil(audioCtx.sampleRate*(d+decay+0.02)),audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for(let i=0;i<data.length;i++){
+          const ratio = i / data.length;
+          data[i] = (Math.random()*2-1)*Math.pow(1-ratio,1.7);
+        }
+        const source = audioCtx.createBufferSource();
+        const filter = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+        const pan = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+        source.buffer = buffer;
+        filter.type = layer.filterType || 'lowpass';
+        filter.frequency.setValueAtTime(numberOr(layer.filterFreq,900),t);
+        filter.Q.value = numberOr(layer.filterQ,0.8);
+        gain.gain.setValueAtTime(numberOr(layer.gain,0.08),t);
+        gain.gain.exponentialRampToValueAtTime(0.001,t+d+decay);
+        source.connect(filter);
+        filter.connect(gain);
+        if(pan){
+          pan.pan.value = numberOr(layer.pan,0);
+          gain.connect(pan);
+          pan.connect(masterGain);
+        }else{
+          gain.connect(masterGain);
+        }
+        source.start(t);
+        source.stop(t+d+decay+0.02);
+      }
+
+      function syncCurrentControls(shouldRender){
+        readDraftFromDom();
+        drawPreview();
+        exportCurrent();
+        if($('autoApply').checked)applyDraft(true);
+        if(shouldRender)renderEditor();
+      }
+
+      function applyShapeTemplate(shape){
+        const target = SHAPE_PRESET_MAP[shape];
+        if(!target)return;
+        const source = (defaults && defaults[target[0]] && defaults[target[0]][target[1]]) ||
+          (presets && presets[target[0]] && presets[target[0]][target[1]]);
+        if(!source || source.alias){
+          showToast('没有找到这个快速模板');
+          return;
+        }
+        const simple = draftToSimple(source);
+        applySimpleToControls(simple);
+        readDraftFromDom();
+        applyDraft(true);
+        drawPreview();
+        exportCurrent();
+        preview();
+        showToast('已套用模板：' + shape);
+      }
+
+      function bindEvents(){
+        if(eventsBound)return;
+        eventsBound = true;
+        $('searchBox').addEventListener('input',renderSoundList);
+        document.querySelectorAll('.categoryTabs button').forEach(button => {
+          button.addEventListener('click', () => {
+            filter = button.dataset.filter;
+            document.querySelectorAll('.categoryTabs button').forEach(b => b.classList.toggle('active',b === button));
+            renderSoundList();
+          });
+        });
+
+        ['wave','filterType'].forEach(id => {
+          $(id).addEventListener('change', () => syncCurrentControls(false));
+        });
+
+        SIMPLE_CONTROL_IDS.forEach(id => {
+          if(!$(id))return;
+          $(id).addEventListener('input', () => syncCurrentControls(false));
+          $(id).addEventListener('change', () => syncCurrentControls(false));
+        });
+
+        $('previewBtn').addEventListener('click',preview);
+        $('previewSeqBtn').addEventListener('click',previewSequence);
+        $('randomizeBtn').addEventListener('click',randomizeCurrent);
+        $('applyBtn').addEventListener('click', () => {
+          applyDraft();
+          showToast('已应用到当前游戏运行状态');
+        });
+        $('resetBtn').addEventListener('click',resetCurrent);
+        document.querySelectorAll('[data-shape]').forEach(button => {
+          button.addEventListener('click', () => applyShapeTemplate(button.dataset.shape));
+        });
+        $('exportAllBtn').addEventListener('click',exportAll);
+        $('exportCurrentBtn').addEventListener('click', () => {
+          exportCurrent();
+          showToast('已导出当前音效');
+        });
+        $('importBtn').addEventListener('click',importJson);
+        $('copyBtn').addEventListener('click',copyJson);
+        document.addEventListener('keydown', event => {
+          if((event.code === 'KeyV' || String(event.key).toLowerCase() === 'v') && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){
+            event.preventDefault();
+            preview();
+          }
+        });
+      }
+
+      function numberOr(value,fallback){
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+      }
+
+      function escapeHtml(value){
+        return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+      }
+
+      function showToast(text){
+        const toast = $('toast');
+        toast.textContent = text;
+        toast.classList.add('show');
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(() => toast.classList.remove('show'),2200);
+      }
+
+      function init(){
+        window.addEventListener('message',handleBridgeMessage);
+        bindEvents();
+        if(connectTarget()){
+          bootInterface();
+        }else{
+          setTimeout(function(){
+            if(booted)return;
+            targetWindow = window;
+            bridgeMode = false;
+            presets = clone(window.GameAudioPresets || {sfx:{}, weapon:{}});
+            defaults = clone(window.GameAudioDefaultPresets || presets);
+            $('connectionStatus').textContent = '独立预览模式';
+            bootInterface();
+          },900);
+        }
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

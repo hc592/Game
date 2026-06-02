@@ -1,0 +1,1 @@
+window.DIFFICULTY = {easy:{label:'休闲',hp:.78,dmg:.75,speed:.92,spawn:.82,desc:'休闲：敌人更少，伤害更低，更适合体验武器和画面。'},normal:{label:'标准',hp:1,dmg:1,speed:1,spawn:1,desc:'标准：敌人数量、血量和伤害保持默认。'},hard:{label:'困难',hp:1.22,dmg:1.18,speed:1.07,spawn:1.16,desc:'困难：敌人更多、更耐打，Boss 压力更明显。'},nightmare:{label:'噩梦',hp:1.48,dmg:1.35,speed:1.14,spawn:1.32,desc:'噩梦：敌潮密度、伤害和血量都显著提高。'}};

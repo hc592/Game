@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<title>星魂舰队 Rogue Survivor</title>
+<link rel="stylesheet" href="./styles.css" />
+<link rel="stylesheet" href="./mobile.css" />
+</head>
+<body>
+<canvas id="game"></canvas>
+<audio id="customBgm" src="./resource/bgm.mp3" loop preload="auto"></audio>
+<div id="ui">
+  <div id="hud" class="panel">
+    <div class="row"><div class="label">生命</div><div class="bar"><div id="hpFill" class="fill"></div></div></div>
+    <div class="row"><div class="label">经验</div><div class="bar"><div id="xpFill" class="fill"></div></div></div>
+    <div class="row"><div class="label">闪避</div><div class="bar"><div id="dashFill" class="fill"></div></div></div>
+    <div class="row"><div class="label">加速</div><div class="bar"><div id="boostFill" class="fill"></div></div></div>
+    <div id="stats"></div>
+  </div>
+  <div id="stageBar" class="panel"><div id="stageTitle"><span id="stageName">第 1 关</span><span id="stageTime">0:00</span></div><div id="timeline"><div id="timelineFill"></div><div class="marker" style="left:31%"></div><div class="marker" style="left:63%"></div><div class="marker boss" style="left:88%"></div></div><div id="stageHint">小规模敌群正在靠近</div></div>
+  <div id="bossHud" class="panel"><div id="bossTop"><span id="bossName">Boss</span><span id="bossPhaseText">Phase I</span><span id="bossPhasePips"><i class="phasePip on"></i><i class="phasePip"></i><i class="phasePip"></i></span></div><div id="bossHpOuter"><div id="bossHpFill"></div></div></div>
+  <div id="weaponList" class="panel"><h3>武器 / 被动</h3><div id="weapons"></div></div>
+  <div id="mini" class="panel"><h3>操作</h3><div><span class="kbd">WASD</span> 移动<br><span class="kbd">鼠标</span> 控制舰首朝向<br><span class="kbd">空格</span> 闪避推进<br><span class="kbd">Shift</span> 按住加速<br><span class="kbd">P / Esc</span> 暂停<br><span class="kbd">M</span> 静音/开启音效<br><span class="kbd">R</span> 死亡后重开</div></div>
+  <div id="message"></div><div id="bigStage"></div>
+</div>
+<div id="startOverlay" class="overlay start-screen">
+  <div class="startRoot">
+    <img id="startLogo" class="startLogo" src="./resource/logo.png" alt="星魂舰队 Logo">
+    <div class="startMenu">
+      <button class="startTextBtn" onclick="startPageTransition(this,'game')">开始游戏</button>
+      <button class="startTextBtn" onclick="window.openShipUpgradePanel && window.openShipUpgradePanel()">战机升级</button>
+      <button class="startTextBtn" onclick="startPageTransition(this,'help')">游戏教程</button>
+      <button class="startTextBtn" onclick="startPageTransition(this,'settings')">游戏设置</button>
+      <button class="startTextBtn" onclick="startPageTransition(this,'exit')">退出游戏</button>
+    </div>
+    <div id="startPanel" class="startPanel">
+      <div id="help" class="startSubPanel">
+        <h2>游戏教程</h2>
+        <p><span class="kbd">WASD</span> 移动，<span class="kbd">鼠标</span> 控制舰首朝向，<span class="kbd">空格</span> 闪避推进，<span class="kbd">Shift</span> 按住加速。</p>
+        <p>击杀敌人获得经验，升级后选择武器或被动卡牌；红色描边代表敌方危险技能，低血量时屏幕边缘会闪烁。</p>
+        <p>开局会先选择两个初始武器，然后进入第 1 关。</p>
+      </div>
+      <div id="settingsPanel" class="startSubPanel">
+        <div class="menuGrid">
+          <div class="menuBox">
+            <h2>难度选择</h2>
+            <div class="diffBtns"><button id="diffEasy" class="smallBtn" onclick="setDifficulty('easy')">休闲</button><button id="diffNormal" class="smallBtn active" onclick="setDifficulty('normal')">标准</button><button id="diffHard" class="smallBtn" onclick="setDifficulty('hard')">困难</button><button id="diffNightmare" class="smallBtn" onclick="setDifficulty('nightmare')">噩梦</button></div>
+            <div id="difficultyDesc" class="subtitle" style="font-size:13px;margin:14px 0 0">标准：敌人数量、血量和伤害保持默认。</div>
+          </div>
+          <div class="menuBox">
+            <h2>设置</h2>
+            <div class="menuLine"><span>音量</span><input class="slider" type="range" min="0" max="100" value="32" oninput="updateSetting('volume',this.value)"></div>
+            <div class="menuLine"><span>屏幕震动</span><input class="slider" type="range" min="0" max="100" value="100" oninput="updateSetting('shake',this.value)"></div>
+            <div class="menuLine"><span>伤害数字</span><span id="toggleDamage" class="toggle on" onclick="toggleSetting('damageNumbers',this)"></span></div>
+            <div class="menuLine"><span>粒子特效</span><span id="toggleParticles" class="toggle on" onclick="toggleSetting('particles',this)"></span></div>
+            <div class="menuLine"><span>危险预警增强</span><span id="toggleDanger" class="toggle on" onclick="toggleSetting('danger',this)"></span></div>
+          </div>
+        </div>
+      </div>
+      <div id="exitTip" class="startSubPanel">
+        <h2>退出游戏</h2>
+        <p>如果浏览器没有自动关闭页面，直接关闭当前标签页即可。普通网页通常会被浏览器限制自动关闭。</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="levelOverlay" class="overlay"><div class="menu"><h1>星舰改装</h1><div class="subtitle">选择一项升级。</div><div id="cards"></div></div></div>
+<div id="pauseOverlay" class="overlay"><div class="menu" style="text-align:center"><h1>暂停</h1><div class="subtitle">战斗已暂停。按 P / Esc 或点击继续。</div><button class="btn" onclick="togglePause(false)">继续游戏</button><button class="btn ghost" onclick="restartGame()">重新开始</button></div></div>
+<div id="gameOver" class="overlay"><div class="menu" style="text-align:center"><h1>战斗终结</h1><div id="finalStats" class="subtitle"></div><button class="btn" onclick="restartGame()">重新开始</button><button class="btn ghost" type="button" onclick="window.returnToMainMenuFromGameOver && window.returnToMainMenuFromGameOver()">返回主菜单</button></div></div>
+
+
+
+
+
+<!-- === UI slim combat HUD patch v11 === -->
+
+
+<!-- === End UI slim combat HUD patch v11 === -->
+
+
+
+<!-- === vNext UI pause clarity patch: pause-time HUD and help are not blurred === -->
+
+
+
+<!-- === Pause HUD one-column stats patch v12 === -->
+
+<!-- === End Pause HUD one-column stats patch v12 === -->
+
+
+
+<!-- === Combat feedback patch v13: damage suffix numbers + red enemy HP + boss HP text === -->
+
+
+<!-- === End Combat feedback patch v13 === -->
+
+
+<!-- === Auto fullscreen on play / exit on pause patch v14 === -->
+
+<!-- === End auto fullscreen patch v14 === -->
+
+
+
+<!-- === ESC fullscreen pause conflict fix v15 === -->
+
+<!-- === End ESC fullscreen pause conflict fix v15 === -->
+
+
+
+<!-- === Pause settings + separate BGM/SFX volume patch v16 === -->
+
+
+<!-- === End pause settings + separate BGM/SFX volume patch v16 === -->
+
+
+
+<!-- === Pause menu duplicate restart text fix v17 === -->
+
+<!-- === End pause menu duplicate restart text fix v17 === -->
+
+
+<!-- === XP curve + slight enemy density/HP balance patch v18 === -->
+
+<!-- === End XP curve + enemy balance patch v18 === -->
+
+<!-- === Card pool logic patch v19: clean base skills, move weapon-specific upgrades to build cards, add XP gain card === -->
+
+<!-- === End card pool logic patch v19 === -->
+
+
+<!-- === Weapon card logic patch v20: white weapon acquisition, colored unlimited upgrades === -->
+
+<!-- === End weapon card logic patch v20 === -->
+
+<!-- === Weapon replacement patch v21: full slots still offer new weapons, choose replacement or cancel === -->
+
+<!-- === End weapon replacement patch v21 === -->
+
+
+
+<!-- === Card display cleanup patch v22: taller cards, shorter card copy === -->
+
+
+<!-- === End card display cleanup patch v22 === -->
+
+<!-- === Card text line-break fix patch v23 === -->
+
+
+<!-- === End card text line-break fix patch v23 === -->
+
+
+
+<!-- === Remove build cards and build resonance patch v24 === -->
+
+
+<!-- === End remove build cards and build resonance patch v24 === -->
+
+<!-- === New category build cards patch v25 === -->
+
+<!-- === End new category build cards patch v25 === -->
+
+
+
+
+<!-- === Final stability patch v26: non-recursive upgrade pool + safe choice closing === -->
+
+<!-- === End final stability patch v26 === -->
+
+
+<!-- === User patch v27: execution protocol, energy disruption, text-only build cards === -->
+
+
+<!-- === End user patch v27 === -->
+
+
+<!-- === User patch v28: elemental attributes and elemental upgrade cards === -->
+
+
+<!-- === End user patch v28 === -->
+
+
+
+<!-- === User patch v29: card UI cleanup === -->
+
+<!-- === End user patch v29 === -->
+
+
+<!-- === User patch v30: element card tag cleanup === -->
+
+<!-- === End user patch v30 === -->
+
+
+<!-- === User patch v31: element label fix, dark desc, rename poison dagger === -->
+
+<!-- === End user patch v31 === -->
+
+
+<!-- === User patch v32: zone weapons aim at mouse crosshair === -->
+
+<!-- === End user patch v32 === -->
+
+
+<!-- === User patch v33: four new weapons and summon build cards === -->
+
+<!-- === End user patch v33 === -->
+
+
+<!-- === User patch v34: summon control and limits === -->
+
+<!-- === End user patch v34 === -->
+
+
+<!-- === User patch v35: larger outlined damage numbers === -->
+
+<!-- === End user patch v35 === -->
+
+
+<!-- === User patch v42: summon lifetime, auto-weapon view targeting, small enemy scale, weaker enemy homing === -->
+
+<!-- === End user patch v42 === -->
+
+
+
+
+
+
+
+
+<!-- === User patch v47: remove accidental square projectile/effect fallback === -->
+
+<!-- === End user patch v47 === -->
+
+<!-- === User patch v48: player ring/square removed === -->
+
+<!-- === User patch v49: energy turret image base/barrel === -->
+
+<!-- === End user patch v49 === -->
+
+
+<!-- === End user patch v50 === -->
+
+
+<!-- === User patch v51: stagger mouse-aimed placement weapons === -->
+
+<!-- === End user patch v51 === -->
+
+
+<!-- === User patch v52: shadow fleet uses 7.png + shorter auto engage range === -->
+
+<!-- === End user patch v52 === -->
+
+
+<!-- === User patch v53: smooth shadow fleet movement + 15s wingman decay + summon aggro === -->
+
+<!-- === End user patch v53 === -->
+
+
+<!-- === User patch v54: wingman facing direction + nose muzzle === -->
+
+<!-- === End user patch v54 === -->
+
+
+
+<!-- === User patch v55: skip new weapon toggle + stronger pre-6 weapon acquisition bias === -->
+
+
+<!-- === End user patch v55 === -->
+
+
+
+<!-- === User patch v56: Dragon Breath crash fix / safe flame renderer === -->
+
+<!-- === End user patch v56 === -->
+
+
+<!-- === User patch v58: star sword keeps original arc slash, but cuts outward === -->
+
+<!-- === End user patch v58 === -->
+
+<!-- === User patch v59: milestone boss + richer fair boss patterns === -->
+
+<!-- === End user patch v59 === -->
+
+<!-- === User patch v60: fix star sword close-range sweep hitbox === -->
+
+<!-- === End user patch v60 === -->
+
+<!-- === User patch v61: start difficulty choice + star sword cooldown rebalance === -->
+
+
+<!-- === End user patch v61 === -->
+
+
+
+<!-- === User patch v62: simple difficulty buttons + stable skip-new-weapon toggle === -->
+
+
+<!-- === End user patch v62 === -->
+
+
+
+<!-- === User patch v65: shadow dagger uses 匕首.png === -->
+
+
+
+
+<!-- === User patch v68: frost missile uses 寒冰.png (source faces upper-right 45deg) === -->
+
+
+
+
+<!-- === User patch v69: hard override frost missile render with 寒冰.png === -->
+
+
+
+
+<!-- === User patch v70: thunderLance renamed to 球形闪电 and uses 雷.png === -->
+
+
+<!-- === User patch v73: pixel shatter monster death effect === -->
+
+
+<!-- === User patch v74: layered combat audio and richer monster defeat SFX === -->
+
+
+<!-- === User patch v76: prevent same-name cards with different qualities in one choice set === -->
+
+
+<!-- === User patch v77: unified card form and description cleanup === -->
+
+
+
+
+<!-- === User patch v78: remove cap/progress limit wording from visible descriptions === -->
+
+
+<!-- === User patch v78b: ASCII-safe cap/progress cleanup === -->
+
+
+<!-- === User patch v79: weapon names and descriptions from reference sheet === -->
+
+
+<!-- === User patch v80: put elemental effect strength on its own line === -->
+
+
+<!-- === User patch v81: put basic skill bonus on the second line === -->
+
+
+<!-- === User patch v82: center first card description line with thin black edge === -->
+
+
+
+<!-- === User patch v83: tactical protocol strength line === -->
+
+
+
+<!-- === Card text fix v84: merge split weapon-upgrade stat arrows === -->
+
+
+<!-- === User patch v85: denser enemies, softer attacks, lighter particles === -->
+
+
+<!-- === User patch v86: extra enemy density and tougher mobile bosses === -->
+
+
+<!-- === User patch v87: plasma ray fire weapon === -->
+
+
+<!-- === User patch v88: debug console for card and damage controls === -->
+
+
+
+<!-- === User patch v89: one-step weapon quality upgrades === -->
+
+
+<!-- === User patch v90: weapon card wording labels === -->
+
+<!-- === User patch v91: rare shield and magnet pickups === -->
+
+<!-- === User patch v92: 100x combat numbers, enemy HP, bigger bosses === -->
+
+<!-- === User patch v93: five new animated pixel minions === -->
+
+
+
+<!-- === User patch v94: stage 6-10 handcrafted pixel bosses === -->
+
+<!-- === User patch v95: requested balance tuning === -->
+
+<!-- === User patch v96: restrained plasma beam and arc emitter visuals === -->
+
+
+<!-- === User patch v96: combat weapon-only panel, pause detail reveal === -->
+
+
+
+<!-- === Combat feedback patch v98: replace enemy hit flash with weapon-color sparks === -->
+
+<!-- === User patch v99: fine body-only pixel repaint for every boss === -->
+
+<!-- === User patch v100: restore original debug console controls === -->
+
+
+<!-- === User patch v101: redesign stage 1 and stage 5 bosses === -->
+
+<!-- === User request v102: restrained layered procedural weapon visuals === -->
+
+<!-- === User patch v103: star sword metadata sync === -->
+
+<!-- === Card display fix v104: normalize new weapon card titles === -->
+
+
+<!-- === User patch v105: Holy Prism ranged block mechanic === -->
+
+
+<!-- === User patch v106: keep Star Sword radiance visible after pierce is spent === -->
+
+
+<!-- === User request v107: faceless restrained boss redesign === -->
+
+
+<!-- === User request v108: refined clean faceless pixel bosses === -->
+
+
+<!-- === User request v109: alien sci-fi redesign for the last five bosses === -->
+
+
+
+<!-- === User patch v110: optimized shadow fleet AI / close-range evade / death explosion === -->
+
+<!-- === End user patch v110 === -->
+
+<!-- === User patch v111: faceless alien repaint for five non-boss monsters === -->
+
+
+<!-- === User patch v112: organic faceless alien minions, less rectangular === -->
+
+
+<!-- === User patch v113: crisp organic pixel aliens === -->
+
+
+<!-- === User patch v114: hand-drawn pixel aliens matching small mob style === -->
+
+
+<!-- === User patch v115: organic non-first boss repaint === -->
+
+
+<!-- === User patch v116: hand-pixel boss repaint matching mob style === -->
+
+
+<!-- === User patch v117: organic mob-style boss sprites === -->
+
+
+<!-- === User patch v118: distinct sci-fi silhouettes for bosses 2-10 === -->
+
+
+<!-- === User patch v119: high-density crisp pixel boss polish === -->
+
+
+<!-- === User request v120: stage 10 black sun singularity embryo redesign === -->
+
+
+<!-- === User patch v121: debug console direct stage jump 1-10 === -->
+
+
+
+
+<!-- === Reliable main-menu tutorial modal patch === -->
+
+
+<div id="tutorialOverlayReliable" aria-hidden="true">
+  <div id="tutorialModalReliable" role="dialog" aria-modal="true" aria-labelledby="tutorialReliableTitle">
+    <div class="tutorialReliableHeader">
+      <button class="tutorialReliableClose" type="button" data-tutorial-close aria-label="返回主菜单">←</button>
+      <div>
+        <h2 id="tutorialReliableTitle">游戏教程</h2>
+        <p>这是一款俯视角星舰 Roguelite 生存游戏。你需要一边移动走位，一边用鼠标控制舰首方向，在敌潮中收集经验、升级武器和被动，最后击败各关 Boss，并在第 10 关完成最终结算。</p>
+      </div>
+    </div>
+
+    <div class="tutorialReliableGrid">
+      <section class="tutorialReliableCard">
+        <h3>基础操作</h3>
+        <div class="tutorialReliableKeys">
+          <div class="tutorialReliableKey"><span class="tutorialReliableKbd">WASD</span><span>移动星舰</span></div>
+          <div class="tutorialReliableKey"><span class="tutorialReliableKbd">鼠标</span><span>控制舰首朝向</span></div>
+          <div class="tutorialReliableKey"><span class="tutorialReliableKbd">空格</span><span>闪避推进，短暂无敌</span></div>
+          <div class="tutorialReliableKey"><span class="tutorialReliableKbd">Shift</span><span>按住加速，消耗能量</span></div>
+          <div class="tutorialReliableKey"><span class="tutorialReliableKbd">P / Esc</span><span>暂停游戏</span></div>
+          <div class="tutorialReliableKey"><span class="tutorialReliableKbd">M</span><span>静音 / 开启音效</span></div>
+        </div>
+      </section>
+
+      <section class="tutorialReliableCard">
+        <h3>开局与升级</h3>
+        <ul>
+          <li>开局先选择两个初始武器，然后进入第 1 关。</li>
+          <li>击杀敌人会掉落经验，拾取后增加经验条。</li>
+          <li>升级时从三张卡牌中选择一项：新武器、武器强化或被动能力。</li>
+          <li>武器通常强化到 Lv.5 后成型，被动能力可以继续叠加。</li>
+        </ul>
+      </section>
+
+      <section class="tutorialReliableCard">
+        <h3>关卡目标</h3>
+        <ul>
+          <li>顶部时间轴显示当前关卡进度。</li>
+          <li>敌潮会分阶段增强，中后段敌人数量会明显增加。</li>
+          <li>时间轴接近尾声时 Boss 登场。第 1–9 关击败 Boss 后进入下一关，第 10 关击败 Boss 后进入结算。</li>
+          <li>核心思路是边移动边输出，不要被敌群压到角落。</li>
+        </ul>
+      </section>
+
+      <section class="tutorialReliableCard">
+        <h3>生存机制</h3>
+        <ul>
+          <li>生命值归零后战斗结束，可以按 <span class="tutorialReliableKbd">R</span> 或点击按钮重新开始。</li>
+          <li>闪避条充满后才能再次闪避，关键时刻用来穿出包围圈。</li>
+          <li>敌方远程攻击和危险技能会有红色预警。</li>
+          <li>低血量时屏幕边缘会闪烁，应优先拉开距离并寻找回复。</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="tutorialReliableFlow">
+      <span>① 选两个初始武器</span>
+      <span>② 击杀敌人捡经验</span>
+      <span>③ 升级选择卡牌</span>
+      <span>④ 熬过敌潮等 Boss</span>
+      <span>⑤ 第 10 关击败 Boss 进入结算</span>
+    </div>
+
+    <div class="tutorialReliableTip">新手建议：前几次可以优先选择自动追踪、范围伤害和生存被动。比如导弹、黑洞、冰霜环、重型装甲这类选择，会比纯手动瞄准武器更稳。</div>
+
+
+  </div>
+</div>
+
+
+
+
+
+<!-- === Reliable main menu settings overlay: same controls as pause settings === -->
+
+
+<div id="mainSettingsOverlayReliable" aria-hidden="true">
+  <div id="mainSettingsModalReliable" role="dialog" aria-modal="true" aria-labelledby="mainSettingsReliableTitle">
+    <div class="mainSettingsReliableHeader">
+      <button class="mainSettingsReliableClose" type="button" data-main-settings-close aria-label="返回主菜单">←</button>
+      <div>
+        <h2 id="mainSettingsReliableTitle">游戏设置</h2>
+        <p>这里的内容与游戏内暂停菜单里的“游戏设置”保持一致。修改后会直接影响当前全局设置，进入游戏后仍然生效。</p>
+      </div>
+    </div>
+
+    <div class="mainSettingsReliableBox">
+      <h3>音频与表现</h3>
+      <div class="menuLine"><span>背景音乐</span><input id="mainBgmVolumeSlider" data-volume-slider="bgm" class="slider" type="range" min="0" max="100" value="14" oninput="mainSettingsReliableSet('bgmVolume',this.value)"><span id="mainBgmVolumeValue" class="volValue">14%</span></div>
+      <div class="menuLine"><span>游戏音效</span><input id="mainSfxVolumeSlider" data-volume-slider="sfx" class="slider" type="range" min="0" max="100" value="60" oninput="mainSettingsReliableSet('sfxVolume',this.value)"><span id="mainSfxVolumeValue" class="volValue">60%</span></div>
+      <div class="menuLine"><span>屏幕震动</span><input id="mainShakeSlider" class="slider" type="range" min="0" max="100" value="100" oninput="mainSettingsReliableSet('shake',this.value)"><span id="mainShakeValue" class="volValue">100%</span></div>
+      <div class="menuLine"><span>伤害数字</span><span id="mainToggleDamage" class="toggle on" onclick="mainSettingsReliableToggle('damageNumbers',this)"></span></div>
+      <div class="menuLine"><span>粒子特效</span><span id="mainToggleParticles" class="toggle on" onclick="mainSettingsReliableToggle('particles',this)"></span></div>
+      <div class="menuLine"><span>危险预警增强</span><span id="mainToggleDanger" class="toggle on" onclick="mainSettingsReliableToggle('danger',this)"></span></div>
+    </div>
+
+    <div class="mainSettingsReliableNote">说明：背景音乐和游戏音效是分开的；屏幕震动只影响受击、爆炸、Boss 等反馈强度；关闭粒子特效可以略微减轻画面压力。</div>
+
+
+  </div>
+</div>
+
+
+<!-- === End reliable main menu settings overlay === -->
+  <script src="./js/data/difficulty.js"></script>
+  <script src="./js/data/weapons.js"></script>
+  <script src="./js/data/skills.js"></script>
+  <script src="./js/data/enemies.js"></script>
+  <script src="./js/data/bosses.js"></script>
+  <script src="./js/core/utils.js"></script>
+  <script src="./js/core/input.js"></script>
+  <script src="./js/core/assets.js"></script>
+  <script src="./js/core/audioPresets.js"></script>
+  <script src="./js/core/audio.js"></script>
+  <script src="./js/systems/uiSystem.js"></script>
+  <script src="./js/systems/effectSystem.js"></script>
+  <script src="./js/systems/combatSystem.js"></script>
+  <script src="./js/systems/projectileSystem.js"></script>
+  <script src="./js/systems/weaponSystem.js"></script>
+  <script src="./js/systems/enemySystem.js"></script>
+  <script src="./js/systems/bossSystem.js"></script>
+  <script src="./js/systems/stageSystem.js"></script>
+  <script src="./js/game.js"></script>
+  <script src="./js/legacy/indexPatches.js"></script>
+  <script src="./js/tools/sfxLab.js"></script>
+  <!-- 存档管理器：监听结算界面，自动保存每一局的结算数据。 -->
+  <script src="./js/saveManager.js"></script>
+  <!-- 战机永久升级系统：源晶结算、余额保存、主菜单升级界面。 -->
+  <script src="./js/shipUpgradeManager.js"></script>
+  <script src="./js/mobileControls.js"></script>
+</body>
+</html>
