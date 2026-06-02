@@ -1,515 +1,571 @@
-(function(){
-  'use strict';
+/* Mobile-only game shell and touch controls. Loaded after styles.css. */
+:root{
+  --mobile-safe-top:env(safe-area-inset-top,0px);
+  --mobile-safe-right:env(safe-area-inset-right,0px);
+  --mobile-safe-bottom:env(safe-area-inset-bottom,0px);
+  --mobile-safe-left:env(safe-area-inset-left,0px);
+  --mobile-stick-size:clamp(106px,22vmin,136px);
+  --mobile-dash-size:72px;
+  --mobile-pause-size:42px;
+  --mobile-edge-gap:12px;
+  --mobile-control-line:rgba(126,247,255,.36);
+  --mobile-control-fill:rgba(5,14,26,.64);
+  --mobile-control-fill-strong:rgba(16,42,62,.78);
+  --mobile-control-gold:#ffe08a;
+  --mobile-control-cyan:#7ef7ff;
+}
 
-  if(window.__gameMobileControlsInstalled)return;
-  window.__gameMobileControlsInstalled=true;
+html.is-mobile-game,
+body.is-mobile-game{
+  width:100%;
+  height:100%;
+  min-height:100dvh;
+  overflow:hidden!important;
+  overscroll-behavior:none;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
 
-  const MOBILE_CLASS='is-mobile-game';
-  const ACTIVE_CLASS='mobile-gameplay-active';
-  const MOVE_DEAD_ZONE=.18;
-  const AIM_DEAD_ZONE=.12;
-  const BOOST_THRESHOLD=.86;
-  const DASH_PULSE_MS=105;
-  const DASH_TAP_LOCK_MS=170;
-  const virtualKeyCodes=[
-    'KeyW','KeyA','KeyS','KeyD',
-    'ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
-    'ShiftLeft','ShiftRight','Space'
-  ];
+body.is-mobile-game #game{
+  width:100vw!important;
+  height:100dvh!important;
+  min-height:100vh!important;
+  cursor:default!important;
+  touch-action:none!important;
+}
 
-  const state={
-    enabled:false,
-    gameplayActive:false,
-    move:{x:0,y:0,power:0,active:false,pointerId:null},
-    aim:{x:1,y:0,power:0,active:false,pointerId:null,lastX:1,lastY:0},
-    dashPulseUntil:0,
-    fullscreenPending:false,
-    orientationLocked:false
-  };
+body.is-mobile-game #ui{
+  width:100vw!important;
+  height:100dvh!important;
+  pointer-events:none!important;
+}
 
-  let controlsEl=null;
-  let moveStick=null;
-  let aimStick=null;
-  let dashButton=null;
-  let pauseButton=null;
-  let rotateHint=null;
-  let lastDashTap=0;
-  let mobileQuery=null;
-  let startActionsWrapped=false;
+body.is-mobile-game #mini,
+body.is-mobile-game #weaponList{
+  display:none!important;
+}
 
-  function clamp(v,min,max){
-    return Math.max(min,Math.min(max,v));
+body.is-mobile-game #hud{
+  left:calc(var(--mobile-safe-left) + 8px)!important;
+  top:calc(var(--mobile-safe-top) + var(--mobile-pause-size) + 12px)!important;
+  width:min(46vw,212px)!important;
+  padding:8px 9px!important;
+  border-radius:4px!important;
+}
+
+body.is-mobile-game #hud .row{
+  gap:6px!important;
+  margin:4px 0!important;
+}
+
+body.is-mobile-game #hud .label{
+  width:36px!important;
+  font-size:10px!important;
+  letter-spacing:0!important;
+}
+
+body.is-mobile-game #hud .bar{
+  height:9px!important;
+}
+
+body.is-mobile-game #stats{
+  display:none!important;
+}
+
+body.is-mobile-game #stageBar{
+  left:auto!important;
+  right:calc(var(--mobile-safe-right) + 8px)!important;
+  top:calc(var(--mobile-safe-top) + 8px)!important;
+  bottom:auto!important;
+  transform:none!important;
+  width:min(50vw,292px)!important;
+  padding:8px 10px!important;
+  border-radius:4px!important;
+}
+
+body.is-mobile-game #stageTitle{
+  font-size:11px!important;
+  line-height:1.1!important;
+  margin-bottom:5px!important;
+  letter-spacing:0!important;
+}
+
+body.is-mobile-game #timeline{
+  height:9px!important;
+}
+
+body.is-mobile-game #stageHint{
+  display:none!important;
+}
+
+body.is-mobile-game #bossHud{
+  left:50%!important;
+  top:calc(var(--mobile-safe-top) + 84px)!important;
+  transform:translateX(-50%)!important;
+  width:calc(100vw - var(--mobile-safe-left) - var(--mobile-safe-right) - 20px)!important;
+  max-width:560px!important;
+  padding:7px 10px!important;
+  border-radius:4px!important;
+}
+
+body.is-mobile-game #bossTop{
+  font-size:11px!important;
+  margin-bottom:5px!important;
+}
+
+body.is-mobile-game #bossHpOuter{
+  height:10px!important;
+}
+
+body.is-mobile-game #message{
+  top:calc(var(--mobile-safe-top) + 72px)!important;
+  width:auto!important;
+  max-width:calc(100vw - 26px)!important;
+  padding:8px 12px!important;
+  border-radius:4px!important;
+  font-size:12px!important;
+  line-height:1.35!important;
+  white-space:normal!important;
+  text-align:center!important;
+}
+
+body.is-mobile-game #message.show{
+  top:calc(var(--mobile-safe-top) + 86px)!important;
+}
+
+body.is-mobile-game #bigStage{
+  width:92vw!important;
+  font-size:clamp(30px,11vw,52px)!important;
+  letter-spacing:.08em!important;
+}
+
+body.is-mobile-game .overlay{
+  min-height:100dvh!important;
+  padding:calc(var(--mobile-safe-top) + 12px) calc(var(--mobile-safe-right) + 12px) calc(var(--mobile-safe-bottom) + 12px) calc(var(--mobile-safe-left) + 12px)!important;
+  touch-action:pan-y!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+
+body.is-mobile-game .menu,
+body.is-mobile-game #pauseOverlay .menu,
+body.is-mobile-game #gameOver .menu{
+  width:min(96vw,620px)!important;
+  max-height:calc(100dvh - var(--mobile-safe-top) - var(--mobile-safe-bottom) - 28px)!important;
+  padding:20px!important;
+  border-radius:6px!important;
+  overflow-y:auto!important;
+  touch-action:pan-y!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+
+body.is-mobile-game h1{
+  font-size:clamp(28px,8vw,42px)!important;
+  line-height:1.12!important;
+}
+
+body.is-mobile-game .subtitle{
+  font-size:13px!important;
+  line-height:1.55!important;
+  margin-bottom:16px!important;
+}
+
+body.is-mobile-game .btn{
+  min-height:44px!important;
+  padding:10px 16px!important;
+  margin:6px!important;
+  font-size:14px!important;
+}
+
+body.is-mobile-game #cards{
+  grid-template-columns:1fr!important;
+  gap:10px!important;
+  margin-top:12px!important;
+  touch-action:pan-y!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+}
+
+body.is-mobile-game .card{
+  min-height:0!important;
+  padding:12px!important;
+  border-radius:5px!important;
+  touch-action:manipulation!important;
+}
+
+body.is-mobile-game .card h3{
+  font-size:17px!important;
+  margin:8px 0!important;
+}
+
+body.is-mobile-game .card p,
+body.is-mobile-game .choiceFooter{
+  font-size:12px!important;
+  line-height:1.45!important;
+}
+
+body.is-mobile-game .previewCanvas{
+  height:86px!important;
+}
+
+body.is-mobile-game .startRoot{
+  width:100vw!important;
+  min-height:100dvh!important;
+  padding:calc(var(--mobile-safe-top) + 5vh) 16px calc(var(--mobile-safe-bottom) + 18px)!important;
+}
+
+body.is-mobile-game .startLogo{
+  width:min(92vw,560px)!important;
+  max-height:34vh!important;
+}
+
+body.is-mobile-game .startMenu{
+  width:min(360px,88vw)!important;
+  margin-top:4vh!important;
+  gap:14px!important;
+}
+
+body.is-mobile-game .startTextBtn{
+  width:min(330px,84vw)!important;
+  min-height:40px!important;
+  padding-bottom:8px!important;
+  font-size:clamp(18px,5vw,23px)!important;
+  letter-spacing:.1em!important;
+}
+
+body.is-mobile-game .startPanel{
+  width:92vw!important;
+  max-height:62dvh!important;
+}
+
+body.is-mobile-game.mobile-landscape #hud{
+  width:min(28vw,224px)!important;
+  top:calc(var(--mobile-safe-top) + 7px)!important;
+  left:calc(var(--mobile-safe-left) + var(--mobile-pause-size) + 14px)!important;
+  padding:6px 8px!important;
+}
+
+body.is-mobile-game.mobile-landscape #hud .row{
+  margin:2px 0!important;
+}
+
+body.is-mobile-game.mobile-landscape #hud .label{
+  width:32px!important;
+  font-size:9px!important;
+}
+
+body.is-mobile-game.mobile-landscape #hud .bar{
+  height:7px!important;
+}
+
+body.is-mobile-game.mobile-landscape #stageBar{
+  width:min(38vw,360px)!important;
+  padding:6px 9px!important;
+}
+
+body.is-mobile-game.mobile-landscape #stageTitle{
+  font-size:10px!important;
+  margin-bottom:4px!important;
+}
+
+body.is-mobile-game.mobile-landscape #timeline{
+  height:7px!important;
+}
+
+body.is-mobile-game.mobile-landscape #bossHud{
+  width:min(70vw,620px)!important;
+}
+
+body.is-mobile-game.mobile-landscape .startRoot{
+  padding:calc(var(--mobile-safe-top) + 10px) 16px calc(var(--mobile-safe-bottom) + 10px)!important;
+}
+
+body.is-mobile-game.mobile-landscape .startLogo{
+  width:min(42vw,360px)!important;
+  max-height:min(25vh,96px)!important;
+}
+
+body.is-mobile-game.mobile-landscape .startMenu{
+  width:min(330px,52vw)!important;
+  margin-top:2vh!important;
+  gap:8px!important;
+}
+
+body.is-mobile-game.mobile-landscape .startTextBtn{
+  width:min(310px,50vw)!important;
+  min-height:32px!important;
+  padding-bottom:5px!important;
+  font-size:clamp(17px,5vh,22px)!important;
+  letter-spacing:.08em!important;
+}
+
+#mobileControls{
+  position:fixed;
+  inset:0;
+  z-index:4;
+  display:none;
+  pointer-events:none;
+  touch-action:none;
+  font-family:var(--px-font,"Consolas","Microsoft YaHei",monospace);
+}
+
+body.is-mobile-game #mobileControls{
+  display:block;
+}
+
+body.is-mobile-game.mobile-portrait #mobileControls{
+  z-index:1000002;
+}
+
+#mobileControls .mobilePlayOnly{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transform:translateY(10px);
+  transition:opacity .14s linear,transform .14s ease,visibility .14s linear;
+}
+
+body.mobile-gameplay-active #mobileControls .mobilePlayOnly{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+  transform:translateY(0);
+}
+
+#mobilePauseButton{
+  position:absolute;
+  left:calc(var(--mobile-safe-left) + var(--mobile-edge-gap));
+  top:calc(var(--mobile-safe-top) + var(--mobile-edge-gap));
+  width:var(--mobile-pause-size);
+  height:var(--mobile-pause-size);
+  border:2px solid var(--mobile-control-line);
+  border-radius:4px;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,0) 35%),
+    var(--mobile-control-fill-strong);
+  color:#f7fcff;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.04em;
+  text-shadow:2px 2px 0 #000;
+  box-shadow:0 0 0 1px #000,3px 3px 0 rgba(0,0,0,.68),inset 0 -4px 0 rgba(0,0,0,.22);
+  touch-action:none;
+}
+
+.mobileStick{
+  position:absolute;
+  width:var(--mobile-stick-size);
+  height:var(--mobile-stick-size);
+  border-radius:50%;
+  touch-action:none;
+  pointer-events:auto;
+}
+
+#mobileMoveStick{
+  left:calc(var(--mobile-safe-left) + var(--mobile-edge-gap));
+  bottom:calc(var(--mobile-safe-bottom) + var(--mobile-edge-gap));
+}
+
+#mobileAimStick{
+  right:calc(var(--mobile-safe-right) + var(--mobile-edge-gap));
+  bottom:calc(var(--mobile-safe-bottom) + var(--mobile-edge-gap));
+}
+
+.mobileStickPad{
+  position:absolute;
+  inset:0;
+  border:2px solid var(--mobile-control-line);
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 50%,rgba(126,247,255,.14),rgba(126,247,255,.05) 42%,rgba(3,10,18,.52) 70%),
+    var(--mobile-control-fill);
+  box-shadow:0 0 0 1px #000,3px 3px 0 rgba(0,0,0,.58),inset 0 0 0 1px rgba(255,255,255,.07),inset 0 -10px 0 rgba(0,0,0,.14);
+}
+
+.mobileStickPad::before,
+.mobileStickPad::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  background:rgba(126,247,255,.26);
+  transform:translate(-50%,-50%);
+}
+
+.mobileStickPad::before{
+  width:70%;
+  height:2px;
+}
+
+.mobileStickPad::after{
+  width:2px;
+  height:70%;
+}
+
+.mobileStickThumb{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:39%;
+  height:39%;
+  border:2px solid rgba(255,255,255,.32);
+  border-radius:50%;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 38%),
+    rgba(23,50,70,.86);
+  box-shadow:0 0 0 1px #000,2px 2px 0 rgba(0,0,0,.62),inset 0 -4px 0 rgba(0,0,0,.2);
+  transform:translate(-50%,-50%);
+  will-change:transform;
+}
+
+.mobileStickLabel{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  color:rgba(239,250,255,.64);
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-shadow:1px 1px 0 #000;
+  pointer-events:none;
+}
+
+.mobileStick.is-active .mobileStickPad{
+  border-color:var(--mobile-control-cyan);
+}
+
+.mobileStick.is-boosting .mobileStickPad{
+  border-color:var(--mobile-control-gold);
+}
+
+.mobileStick.is-boosting .mobileStickThumb{
+  border-color:var(--mobile-control-gold);
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,0) 38%),
+    rgba(76,57,31,.9);
+}
+
+#mobileDashButton{
+  position:absolute;
+  width:var(--mobile-dash-size);
+  height:var(--mobile-dash-size);
+  border:2px solid rgba(255,224,138,.48);
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 32%,rgba(255,255,255,.24),rgba(255,255,255,0) 30%),
+    linear-gradient(180deg,rgba(67,47,33,.88),rgba(18,14,19,.84));
+  color:#fff7d8;
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-shadow:2px 2px 0 #000;
+  box-shadow:0 0 0 1px #000,4px 4px 0 rgba(0,0,0,.62),inset 0 -8px 0 rgba(0,0,0,.22);
+  touch-action:none;
+}
+
+#mobileDashButton.is-pressed{
+  transform:translate(2px,2px) scale(.96);
+  border-color:#fff0aa;
+  box-shadow:0 0 0 1px #000,2px 2px 0 rgba(0,0,0,.72),inset 0 -4px 0 rgba(0,0,0,.2);
+}
+
+@media(orientation:landscape){
+  #mobileDashButton{
+    right:calc(var(--mobile-safe-right) + var(--mobile-stick-size) + var(--mobile-edge-gap) + 14px);
+    bottom:calc(var(--mobile-safe-bottom) + var(--mobile-edge-gap) + 10px);
   }
-
-  function input(){
-    return window.GameInput||null;
+  body.is-mobile-game #cards{
+    grid-template-columns:repeat(3,1fr)!important;
   }
-
-  function runtime(){
-    return window.GameRuntime||null;
+  body.is-mobile-game .card{
+    padding:10px!important;
   }
-
-  function isVisible(id){
-    const el=document.getElementById(id);
-    if(!el)return false;
-    const style=getComputedStyle(el);
-    return style.display!=='none'&&style.visibility!=='hidden'&&style.opacity!=='0';
+  body.is-mobile-game .previewCanvas{
+    height:70px!important;
   }
+}
 
-  function shouldEnableMobileMode(){
-    if(/[?&]mobile=1(?:&|$)/.test(location.search))return true;
-    if(/[?&]mobile=0(?:&|$)/.test(location.search))return false;
-    const coarse=matchMedia('(pointer: coarse)').matches||matchMedia('(hover: none)').matches;
-    const hasTouch=(navigator.maxTouchPoints||0)>0;
-    const shortSide=Math.min(innerWidth,innerHeight);
-    const longSide=Math.max(innerWidth,innerHeight);
-    return (coarse||hasTouch)&&(shortSide<=930||longSide<=1180);
+@media(orientation:portrait){
+  :root{
+    --mobile-stick-size:clamp(104px,30vw,126px);
   }
-
-  function fullscreenElement(){
-    return document.fullscreenElement||document.webkitFullscreenElement||document.msFullscreenElement||null;
+  body.is-mobile-game #hud{
+    width:min(44vw,176px)!important;
+    top:calc(var(--mobile-safe-top) + 58px)!important;
   }
-
-  function fullscreenRequestElement(){
-    return document.documentElement||document.body;
+  body.is-mobile-game #stageBar{
+    width:min(53vw,218px)!important;
   }
-
-  function updateResponsiveVars(){
-    if(!state.enabled){
-      document.body.classList.remove('mobile-landscape','mobile-portrait');
-      return;
-    }
-    const root=document.documentElement;
-    const shortSide=Math.min(innerWidth,innerHeight);
-    const longSide=Math.max(innerWidth,innerHeight);
-    const landscape=innerWidth>=innerHeight;
-    const sizeBase=landscape?shortSide:Math.min(shortSide,longSide*.52);
-    const stick=Math.round(clamp(sizeBase*(landscape ? .225 : .30),landscape?78:96,landscape?118:136));
-    const dash=Math.round(clamp(stick*.52,landscape?46:54,landscape?66:78));
-    const pause=Math.round(clamp(sizeBase*(landscape ? .084 : .105),landscape?32:38,landscape?44:54));
-    const gap=Math.round(clamp(sizeBase*(landscape ? .024 : .035),landscape?8:10,landscape?18:24));
-    root.style.setProperty('--mobile-stick-size',stick+'px');
-    root.style.setProperty('--mobile-dash-size',dash+'px');
-    root.style.setProperty('--mobile-pause-size',pause+'px');
-    root.style.setProperty('--mobile-edge-gap',gap+'px');
-    document.body.classList.toggle('mobile-landscape',landscape);
-    document.body.classList.toggle('mobile-portrait',!landscape);
+  #mobileDashButton{
+    right:calc(var(--mobile-safe-right) + 24px);
+    bottom:calc(var(--mobile-safe-bottom) + var(--mobile-stick-size) + 38px);
   }
+}
 
-  function lockLandscape(){
-    const orientation=screen.orientation||screen.mozOrientation||screen.msOrientation;
-    if(!orientation||typeof orientation.lock!=='function')return Promise.resolve(false);
-    return orientation.lock('landscape').then(()=>{
-      state.orientationLocked=true;
-      return true;
-    }).catch(()=>false);
+@media(max-height:430px) and (orientation:landscape){
+  body.is-mobile-game #hud{
+    top:calc(var(--mobile-safe-top) + 7px)!important;
   }
-
-  function requestLandscapeFullscreen(){
-    if(!state.enabled)return Promise.resolve(false);
-    updateResponsiveVars();
-    const el=fullscreenRequestElement();
-    const request=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
-    const afterFullscreen=()=>lockLandscape();
-    if(fullscreenElement())return afterFullscreen();
-    if(!request){
-      state.fullscreenPending=true;
-      return Promise.resolve(false);
-    }
-    let result;
-    try{
-      result=request.call(el);
-    }catch(e){
-      state.fullscreenPending=true;
-      return Promise.resolve(false);
-    }
-    if(result&&typeof result.then==='function'){
-      return result.then(()=>{
-        state.fullscreenPending=false;
-        return afterFullscreen();
-      }).catch(()=>{
-        state.fullscreenPending=true;
-        return false;
-      });
-    }
-    state.fullscreenPending=false;
-    return afterFullscreen();
+  body.is-mobile-game #stageBar{
+    width:min(38vw,340px)!important;
   }
-
-  function setVirtualKey(code,value){
-    const gameInput=input();
-    if(gameInput&&gameInput.keys)gameInput.keys[code]=!!value;
+  #mobileDashButton{
+    right:calc(var(--mobile-safe-right) + var(--mobile-stick-size) + var(--mobile-edge-gap) + 12px);
+    bottom:calc(var(--mobile-safe-bottom) + var(--mobile-edge-gap) + 8px);
   }
+}
 
-  function releaseVirtualKeys(){
-    virtualKeyCodes.forEach(code=>setVirtualKey(code,false));
-  }
+#mobileRotateHint{
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:rgba(1,4,10,.72);
+  pointer-events:auto;
+}
 
-  function releaseStick(kind){
-    const stick=state[kind];
-    stick.x=0;
-    stick.y=0;
-    stick.power=0;
-    stick.active=false;
-    stick.pointerId=null;
-    const el=kind==='move'?moveStick:aimStick;
-    if(el){
-      el.classList.remove('is-active','is-boosting');
-      const thumb=el.querySelector('.mobileStickThumb');
-      if(thumb)thumb.style.transform='translate(-50%,-50%)';
-    }
-  }
+body.is-mobile-game.mobile-portrait #mobileRotateHint{
+  display:flex;
+}
 
-  function setStickFromPointer(kind,event){
-    const el=kind==='move'?moveStick:aimStick;
-    if(!el)return;
-    const rect=el.getBoundingClientRect();
-    const radius=Math.max(1,rect.width*.42);
-    let x=(event.clientX-(rect.left+rect.width/2))/radius;
-    let y=(event.clientY-(rect.top+rect.height/2))/radius;
-    const rawPower=Math.hypot(x,y);
-    if(rawPower>1){
-      x/=rawPower;
-      y/=rawPower;
-    }
-    const power=clamp(rawPower,0,1);
-    const dead=kind==='move'?MOVE_DEAD_ZONE:AIM_DEAD_ZONE;
-    if(power<dead){
-      x=0;
-      y=0;
-    }
-    const stick=state[kind];
-    stick.x=x;
-    stick.y=y;
-    stick.power=power;
-    stick.active=true;
-    if(kind==='aim'&&power>=AIM_DEAD_ZONE){
-      stick.lastX=x;
-      stick.lastY=y;
-    }
-    const thumb=el.querySelector('.mobileStickThumb');
-    if(thumb){
-      const travel=rect.width*.27;
-      thumb.style.transform=`translate(calc(-50% + ${x*travel}px), calc(-50% + ${y*travel}px))`;
-    }
-    el.classList.toggle('is-active',power>=dead);
-    el.classList.toggle('is-boosting',kind==='move'&&power>=BOOST_THRESHOLD);
-  }
+.mobileRotatePanel{
+  width:min(320px,82vw);
+  border:2px solid rgba(126,247,255,.32);
+  border-radius:6px;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 22%),
+    rgba(6,15,27,.94);
+  color:#eef8ff;
+  text-align:center;
+  padding:18px 18px 16px;
+  box-shadow:0 0 0 1px #000,4px 4px 0 rgba(0,0,0,.7),inset 0 -8px 0 rgba(0,0,0,.18);
+  text-shadow:2px 2px 0 #000;
+}
 
-  function bindStick(el,kind){
-    el.addEventListener('pointerdown',event=>{
-      if(!state.enabled)return;
-      event.preventDefault();
-      event.stopPropagation();
-      requestLandscapeFullscreen();
-      const stick=state[kind];
-      stick.pointerId=event.pointerId;
-      try{el.setPointerCapture(event.pointerId)}catch(e){}
-      setStickFromPointer(kind,event);
-    });
-    el.addEventListener('pointermove',event=>{
-      const stick=state[kind];
-      if(stick.pointerId!==event.pointerId)return;
-      event.preventDefault();
-      event.stopPropagation();
-      setStickFromPointer(kind,event);
-    });
-    ['pointerup','pointercancel','lostpointercapture'].forEach(type=>{
-      el.addEventListener(type,event=>{
-        const stick=state[kind];
-        if(stick.pointerId!==event.pointerId&&type!=='lostpointercapture')return;
-        event.preventDefault();
-        event.stopPropagation();
-        releaseStick(kind);
-      });
-    });
-  }
+.mobileRotateIcon{
+  width:58px;
+  height:58px;
+  margin:0 auto 12px;
+  border:3px solid var(--mobile-control-cyan);
+  border-radius:12px;
+  transform:rotate(90deg);
+  box-shadow:0 0 0 2px #000,inset 0 0 0 4px rgba(126,247,255,.08);
+}
 
-  function triggerDash(event){
-    if(!state.enabled||!state.gameplayActive)return;
-    event.preventDefault();
-    event.stopPropagation();
-    requestLandscapeFullscreen();
-    const now=performance.now();
-    if(now-lastDashTap<DASH_TAP_LOCK_MS)return;
-    lastDashTap=now;
-    state.dashPulseUntil=now+DASH_PULSE_MS;
-    if(dashButton)dashButton.classList.add('is-pressed');
-  }
+.mobileRotateTitle{
+  font-size:18px;
+  font-weight:900;
+  letter-spacing:.08em;
+  color:#fff;
+}
 
-  function triggerPause(event){
-    if(!state.enabled)return;
-    event.preventDefault();
-    event.stopPropagation();
-    requestLandscapeFullscreen();
-    const rt=runtime();
-    if(!rt||!rt.started||rt.gameOver||isVisible('levelOverlay'))return;
-    const fn=window.togglePause||(window.GameUI&&window.GameUI.togglePause);
-    if(typeof fn==='function')fn();
-  }
-
-  function createStick(id,label){
-    const stick=document.createElement('div');
-    stick.id=id;
-    stick.className='mobileStick mobilePlayOnly';
-    stick.setAttribute('role','application');
-    stick.setAttribute('aria-label',label+' joystick');
-
-    const pad=document.createElement('div');
-    pad.className='mobileStickPad';
-    const thumb=document.createElement('div');
-    thumb.className='mobileStickThumb';
-    const text=document.createElement('div');
-    text.className='mobileStickLabel';
-    text.textContent=label;
-
-    stick.appendChild(pad);
-    stick.appendChild(thumb);
-    stick.appendChild(text);
-    return stick;
-  }
-
-  function ensureDom(){
-    if(controlsEl)return;
-
-    controlsEl=document.createElement('div');
-    controlsEl.id='mobileControls';
-    controlsEl.setAttribute('aria-hidden','true');
-
-    pauseButton=document.createElement('button');
-    pauseButton.id='mobilePauseButton';
-    pauseButton.className='mobilePlayOnly';
-    pauseButton.type='button';
-    pauseButton.textContent='ESC';
-    pauseButton.setAttribute('aria-label','Open pause menu');
-
-    moveStick=createStick('mobileMoveStick','MOVE');
-    aimStick=createStick('mobileAimStick','AIM');
-
-    dashButton=document.createElement('button');
-    dashButton.id='mobileDashButton';
-    dashButton.className='mobilePlayOnly';
-    dashButton.type='button';
-    dashButton.textContent='DASH';
-    dashButton.setAttribute('aria-label','Dash');
-
-    rotateHint=document.createElement('div');
-    rotateHint.id='mobileRotateHint';
-    rotateHint.innerHTML='<div class="mobileRotatePanel"><div class="mobileRotateIcon"></div><div class="mobileRotateTitle">请横屏游玩</div><div class="mobileRotateText">点击屏幕会尝试进入全屏并锁定横屏。</div></div>';
-
-    controlsEl.appendChild(pauseButton);
-    controlsEl.appendChild(moveStick);
-    controlsEl.appendChild(aimStick);
-    controlsEl.appendChild(dashButton);
-    controlsEl.appendChild(rotateHint);
-    document.body.appendChild(controlsEl);
-
-    bindStick(moveStick,'move');
-    bindStick(aimStick,'aim');
-    dashButton.addEventListener('pointerdown',triggerDash);
-    dashButton.addEventListener('pointerup',event=>{
-      event.preventDefault();
-      event.stopPropagation();
-      if(dashButton)dashButton.classList.remove('is-pressed');
-    });
-    dashButton.addEventListener('pointercancel',event=>{
-      event.preventDefault();
-      event.stopPropagation();
-      if(dashButton)dashButton.classList.remove('is-pressed');
-    });
-    pauseButton.addEventListener('pointerdown',triggerPause);
-    rotateHint.addEventListener('pointerdown',event=>{
-      event.preventDefault();
-      event.stopPropagation();
-      requestLandscapeFullscreen();
-    });
-  }
-
-  function applyViewportMeta(){
-    let meta=document.querySelector('meta[name="viewport"]');
-    if(!meta){
-      meta=document.createElement('meta');
-      meta.name='viewport';
-      document.head.appendChild(meta);
-    }
-    const content=meta.getAttribute('content')||'width=device-width, initial-scale=1.0';
-    const tokens=content.split(',').map(v=>v.trim()).filter(Boolean);
-    ['viewport-fit=cover','user-scalable=no'].forEach(token=>{
-      if(!tokens.some(v=>v.toLowerCase()===token))tokens.push(token);
-    });
-    meta.setAttribute('content',tokens.join(', '));
-  }
-
-  function setMobileMode(next){
-    next=!!next;
-    if(next)ensureDom();
-    if(state.enabled===next){
-      if(next)updateResponsiveVars();
-      return;
-    }
-    state.enabled=next;
-    document.documentElement.classList.toggle(MOBILE_CLASS,next);
-    document.body.classList.toggle(MOBILE_CLASS,next);
-    if(controlsEl)controlsEl.setAttribute('aria-hidden',next?'false':'true');
-    if(!next){
-      releaseStick('move');
-      releaseStick('aim');
-      releaseVirtualKeys();
-      state.gameplayActive=false;
-      document.body.classList.remove(ACTIVE_CLASS,'mobile-landscape','mobile-portrait');
-    }else{
-      applyViewportMeta();
-      updateResponsiveVars();
-      requestLandscapeFullscreen();
-    }
-  }
-
-  function updateGameplayActive(){
-    const rt=runtime();
-    const active=!!(state.enabled&&rt&&rt.started&&!rt.paused&&!rt.gameOver&&!isVisible('levelOverlay')&&!isVisible('startOverlay')&&!isVisible('gameOver'));
-    if(state.gameplayActive!==active){
-      state.gameplayActive=active;
-      document.body.classList.toggle(ACTIVE_CLASS,active);
-      if(!active){
-        releaseStick('move');
-        releaseVirtualKeys();
-        if(dashButton)dashButton.classList.remove('is-pressed');
-      }
-    }
-  }
-
-  function applyMoveInput(){
-    const moving=state.gameplayActive&&state.move.active&&state.move.power>=MOVE_DEAD_ZONE;
-    const x=moving?state.move.x:0;
-    const y=moving?state.move.y:0;
-    setVirtualKey('KeyD',x>.24);
-    setVirtualKey('KeyA',x<-.24);
-    setVirtualKey('KeyS',y>.24);
-    setVirtualKey('KeyW',y<-.24);
-    setVirtualKey('ArrowRight',false);
-    setVirtualKey('ArrowLeft',false);
-    setVirtualKey('ArrowDown',false);
-    setVirtualKey('ArrowUp',false);
-    const boosting=moving&&state.move.power>=BOOST_THRESHOLD;
-    setVirtualKey('ShiftLeft',boosting);
-    setVirtualKey('ShiftRight',false);
-  }
-
-  function applyAimInput(){
-    if(!state.gameplayActive)return;
-    const gameInput=input();
-    const rt=runtime();
-    if(!gameInput||!gameInput.mouse||!rt||!rt.player)return;
-    const aim=state.aim;
-    let x=aim.lastX;
-    let y=aim.lastY;
-    if(aim.active&&aim.power>=AIM_DEAD_ZONE){
-      x=aim.x;
-      y=aim.y;
-      aim.lastX=x;
-      aim.lastY=y;
-    }
-    const len=Math.hypot(x,y)||1;
-    x/=len;
-    y/=len;
-    const player=rt.player;
-    const camera=rt.camera||{x:0,y:0};
-    const screenX=player.x-camera.x;
-    const screenY=player.y-camera.y;
-    const aimDistance=clamp(Math.max(innerWidth,innerHeight)*.55,260,540);
-    gameInput.mouse.x=screenX+x*aimDistance;
-    gameInput.mouse.y=screenY+y*aimDistance;
-  }
-
-  function applyDashInput(){
-    const active=state.gameplayActive&&performance.now()<state.dashPulseUntil;
-    setVirtualKey('Space',active);
-    if(!active&&dashButton)dashButton.classList.remove('is-pressed');
-  }
-
-  function tick(){
-    updateGameplayActive();
-    if(state.enabled&&state.gameplayActive){
-      applyMoveInput();
-      applyAimInput();
-      applyDashInput();
-    }else if(state.enabled){
-      releaseVirtualKeys();
-    }
-    requestAnimationFrame(tick);
-  }
-
-  function refreshMobileMode(){
-    setMobileMode(shouldEnableMobileMode());
-    if(state.enabled)requestLandscapeFullscreen();
-  }
-
-  function preventMobileGestures(event){
-    if(!state.enabled)return;
-    const target=event.target;
-    if(target&&target.closest&&target.closest('.overlay,.menu,#cards,.card,#startOverlay,#levelOverlay,#pauseOverlay,#gameOver,#tutorialOverlayReliable,#mainSettingsOverlayReliable,#shipUpgradeOverlay,input,textarea,select')){
-      return;
-    }
-    event.preventDefault();
-  }
-
-  function handleMobileGesture(event){
-    if(!state.enabled)return;
-    if(event&&event.target&&event.target.closest&&event.target.closest('input,textarea,select'))return;
-    requestLandscapeFullscreen();
-  }
-
-  function wrapStartActions(){
-    if(startActionsWrapped)return;
-    ['startGame','restartGame'].forEach(name=>{
-      const original=window[name];
-      if(typeof original!=='function'||original.__mobileFullscreenWrapped)return;
-      const wrapped=function(){
-        if(state.enabled)requestLandscapeFullscreen();
-        return original.apply(this,arguments);
-      };
-      wrapped.__mobileFullscreenWrapped=true;
-      window[name]=wrapped;
-    });
-    startActionsWrapped=true;
-  }
-
-  function init(){
-    mobileQuery=matchMedia('(pointer: coarse), (hover: none), (max-width: 820px)');
-    wrapStartActions();
-    refreshMobileMode();
-    addEventListener('resize',()=>{
-      updateResponsiveVars();
-      refreshMobileMode();
-    },{passive:true});
-    addEventListener('orientationchange',()=>{
-      setTimeout(updateResponsiveVars,80);
-      setTimeout(refreshMobileMode,120);
-    },{passive:true});
-    ['pointerdown','touchstart','click'].forEach(type=>{
-      document.addEventListener(type,handleMobileGesture,{capture:true,passive:true});
-    });
-    ['fullscreenchange','webkitfullscreenchange','MSFullscreenChange'].forEach(type=>{
-      document.addEventListener(type,()=>{
-        updateResponsiveVars();
-        if(state.enabled&&fullscreenElement())lockLandscape();
-      });
-    });
-    if(mobileQuery.addEventListener)mobileQuery.addEventListener('change',refreshMobileMode);
-    else if(mobileQuery.addListener)mobileQuery.addListener(refreshMobileMode);
-    document.addEventListener('touchmove',preventMobileGestures,{passive:false});
-    document.addEventListener('gesturestart',preventMobileGestures,{passive:false});
-    requestAnimationFrame(tick);
-  }
-
-  window.GameMobileControls={
-    state,
-    refresh:refreshMobileMode,
-    requestFullscreen:requestLandscapeFullscreen,
-    setMobileMode,
-    release:releaseVirtualKeys
-  };
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
-  else init();
-})();
+.mobileRotateText{
+  margin-top:8px;
+  font-size:13px;
+  line-height:1.55;
+  color:#cfe4ff;
+}
