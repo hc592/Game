@@ -84,10 +84,10 @@
     const longSide=Math.max(innerWidth,innerHeight);
     const landscape=innerWidth>=innerHeight;
     const sizeBase=landscape?shortSide:Math.min(shortSide,longSide*.52);
-    const stick=Math.round(clamp(sizeBase*(landscape ? .29 : .31),92,146));
-    const dash=Math.round(clamp(stick*.57,56,82));
-    const pause=Math.round(clamp(sizeBase*.108,38,54));
-    const gap=Math.round(clamp(sizeBase*.035,10,24));
+    const stick=Math.round(clamp(sizeBase*(landscape ? .225 : .30),landscape?78:96,landscape?118:136));
+    const dash=Math.round(clamp(stick*.52,landscape?46:54,landscape?66:78));
+    const pause=Math.round(clamp(sizeBase*(landscape ? .084 : .105),landscape?32:38,landscape?44:54));
+    const gap=Math.round(clamp(sizeBase*(landscape ? .024 : .035),landscape?8:10,landscape?18:24));
     root.style.setProperty('--mobile-stick-size',stick+'px');
     root.style.setProperty('--mobile-dash-size',dash+'px');
     root.style.setProperty('--mobile-pause-size',pause+'px');
@@ -445,7 +445,12 @@
   }
 
   function preventMobileGestures(event){
-    if(state.enabled)event.preventDefault();
+    if(!state.enabled)return;
+    const target=event.target;
+    if(target&&target.closest&&target.closest('.overlay,.menu,#cards,.card,#startOverlay,#levelOverlay,#pauseOverlay,#gameOver,#tutorialOverlayReliable,#mainSettingsOverlayReliable,#shipUpgradeOverlay,input,textarea,select')){
+      return;
+    }
+    event.preventDefault();
   }
 
   function handleMobileGesture(event){
