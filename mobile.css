@@ -5,6 +5,9 @@
   --mobile-safe-bottom:env(safe-area-inset-bottom,0px);
   --mobile-safe-left:env(safe-area-inset-left,0px);
   --mobile-stick-size:clamp(106px,22vmin,136px);
+  --mobile-dash-size:72px;
+  --mobile-pause-size:42px;
+  --mobile-edge-gap:12px;
   --mobile-control-line:rgba(126,247,255,.36);
   --mobile-control-fill:rgba(5,14,26,.64);
   --mobile-control-fill-strong:rgba(16,42,62,.78);
@@ -44,7 +47,7 @@ body.is-mobile-game #weaponList{
 
 body.is-mobile-game #hud{
   left:calc(var(--mobile-safe-left) + 8px)!important;
-  top:calc(var(--mobile-safe-top) + 56px)!important;
+  top:calc(var(--mobile-safe-top) + var(--mobile-pause-size) + 12px)!important;
   width:min(46vw,212px)!important;
   padding:8px 9px!important;
   border-radius:4px!important;
@@ -225,6 +228,47 @@ body.is-mobile-game .startPanel{
   max-height:62dvh!important;
 }
 
+body.is-mobile-game.mobile-landscape #hud{
+  width:min(31vw,250px)!important;
+  top:calc(var(--mobile-safe-top) + 8px)!important;
+  left:calc(var(--mobile-safe-left) + var(--mobile-pause-size) + 18px)!important;
+}
+
+body.is-mobile-game.mobile-landscape #hud .row{
+  margin:3px 0!important;
+}
+
+body.is-mobile-game.mobile-landscape #stageBar{
+  width:min(42vw,420px)!important;
+}
+
+body.is-mobile-game.mobile-landscape #bossHud{
+  width:min(70vw,620px)!important;
+}
+
+body.is-mobile-game.mobile-landscape .startRoot{
+  padding:calc(var(--mobile-safe-top) + 10px) 16px calc(var(--mobile-safe-bottom) + 10px)!important;
+}
+
+body.is-mobile-game.mobile-landscape .startLogo{
+  width:min(42vw,360px)!important;
+  max-height:min(25vh,96px)!important;
+}
+
+body.is-mobile-game.mobile-landscape .startMenu{
+  width:min(330px,52vw)!important;
+  margin-top:2vh!important;
+  gap:8px!important;
+}
+
+body.is-mobile-game.mobile-landscape .startTextBtn{
+  width:min(310px,50vw)!important;
+  min-height:32px!important;
+  padding-bottom:5px!important;
+  font-size:clamp(17px,5vh,22px)!important;
+  letter-spacing:.08em!important;
+}
+
 #mobileControls{
   position:fixed;
   inset:0;
@@ -237,6 +281,10 @@ body.is-mobile-game .startPanel{
 
 body.is-mobile-game #mobileControls{
   display:block;
+}
+
+body.is-mobile-game.mobile-portrait #mobileControls{
+  z-index:1000002;
 }
 
 #mobileControls .mobilePlayOnly{
@@ -256,10 +304,10 @@ body.mobile-gameplay-active #mobileControls .mobilePlayOnly{
 
 #mobilePauseButton{
   position:absolute;
-  left:calc(var(--mobile-safe-left) + 9px);
-  top:calc(var(--mobile-safe-top) + 9px);
-  width:42px;
-  height:42px;
+  left:calc(var(--mobile-safe-left) + var(--mobile-edge-gap));
+  top:calc(var(--mobile-safe-top) + var(--mobile-edge-gap));
+  width:var(--mobile-pause-size);
+  height:var(--mobile-pause-size);
   border:2px solid var(--mobile-control-line);
   border-radius:4px;
   background:
@@ -284,13 +332,13 @@ body.mobile-gameplay-active #mobileControls .mobilePlayOnly{
 }
 
 #mobileMoveStick{
-  left:calc(var(--mobile-safe-left) + clamp(12px,3vw,26px));
-  bottom:calc(var(--mobile-safe-bottom) + clamp(14px,4vh,32px));
+  left:calc(var(--mobile-safe-left) + var(--mobile-edge-gap));
+  bottom:calc(var(--mobile-safe-bottom) + var(--mobile-edge-gap));
 }
 
 #mobileAimStick{
-  right:calc(var(--mobile-safe-right) + clamp(12px,3vw,26px));
-  bottom:calc(var(--mobile-safe-bottom) + clamp(14px,4vh,32px));
+  right:calc(var(--mobile-safe-right) + var(--mobile-edge-gap));
+  bottom:calc(var(--mobile-safe-bottom) + var(--mobile-edge-gap));
 }
 
 .mobileStickPad{
@@ -370,8 +418,8 @@ body.mobile-gameplay-active #mobileControls .mobilePlayOnly{
 
 #mobileDashButton{
   position:absolute;
-  width:72px;
-  height:72px;
+  width:var(--mobile-dash-size);
+  height:var(--mobile-dash-size);
   border:2px solid rgba(255,224,138,.48);
   border-radius:50%;
   background:
@@ -394,8 +442,17 @@ body.mobile-gameplay-active #mobileControls .mobilePlayOnly{
 
 @media(orientation:landscape){
   #mobileDashButton{
-    right:calc(var(--mobile-safe-right) + var(--mobile-stick-size) + 24px);
-    bottom:calc(var(--mobile-safe-bottom) + 34px);
+    right:calc(var(--mobile-safe-right) + var(--mobile-stick-size) + var(--mobile-edge-gap) + 18px);
+    bottom:calc(var(--mobile-safe-bottom) + var(--mobile-edge-gap) + 16px);
+  }
+  body.is-mobile-game #cards{
+    grid-template-columns:repeat(3,1fr)!important;
+  }
+  body.is-mobile-game .card{
+    padding:10px!important;
+  }
+  body.is-mobile-game .previewCanvas{
+    height:70px!important;
   }
 }
 
@@ -427,9 +484,60 @@ body.mobile-gameplay-active #mobileControls .mobilePlayOnly{
     width:min(44vw,300px)!important;
   }
   #mobileDashButton{
-    width:64px;
-    height:64px;
     right:calc(var(--mobile-safe-right) + var(--mobile-stick-size) + 18px);
     bottom:calc(var(--mobile-safe-bottom) + 26px);
   }
+}
+
+#mobileRotateHint{
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:rgba(1,4,10,.72);
+  pointer-events:auto;
+}
+
+body.is-mobile-game.mobile-portrait #mobileRotateHint{
+  display:flex;
+}
+
+.mobileRotatePanel{
+  width:min(320px,82vw);
+  border:2px solid rgba(126,247,255,.32);
+  border-radius:6px;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 22%),
+    rgba(6,15,27,.94);
+  color:#eef8ff;
+  text-align:center;
+  padding:18px 18px 16px;
+  box-shadow:0 0 0 1px #000,4px 4px 0 rgba(0,0,0,.7),inset 0 -8px 0 rgba(0,0,0,.18);
+  text-shadow:2px 2px 0 #000;
+}
+
+.mobileRotateIcon{
+  width:58px;
+  height:58px;
+  margin:0 auto 12px;
+  border:3px solid var(--mobile-control-cyan);
+  border-radius:12px;
+  transform:rotate(90deg);
+  box-shadow:0 0 0 2px #000,inset 0 0 0 4px rgba(126,247,255,.08);
+}
+
+.mobileRotateTitle{
+  font-size:18px;
+  font-weight:900;
+  letter-spacing:.08em;
+  color:#fff;
+}
+
+.mobileRotateText{
+  margin-top:8px;
+  font-size:13px;
+  line-height:1.55;
+  color:#cfe4ff;
 }
